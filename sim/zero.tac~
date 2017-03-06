@@ -1,0 +1,10 @@
+;
+; 0-th tac test
+;
+
+start: mov #6 100
+       mov #7 101
+       add 100 101 102
+       hlt
+
+; EOF
