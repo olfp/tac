@@ -1,6 +1,0 @@
-// start comment
-var i <- 1; // line comment
-var n <- 42; // some number
-var a, b, c;
-var j, k, foo <- 42;
-// EOF
