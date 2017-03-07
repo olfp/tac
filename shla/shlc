@@ -378,9 +378,10 @@ cardinal: /- ( DIGIT+ )/
 		    unshift @$list, $cv;
 		} else {
 		    print "\t" if !$haslbl;
+		    $v = "#$v" if($v =~ /^\d/);
 		    print "COM $v $t\n";
 		    $haslbl = 0;
-		    unshift @$list, "$t"; $t++;
+		    unshift @$list, "\@$t"; $t++;
 		}
 	    } else {
 		unshift @$list, $v;
