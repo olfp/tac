@@ -98,6 +98,7 @@ my $lineno = 0;
 my %brklst = ();
 my $wchlst = "";
 my $halted = 0;
+my $running = 1;
 
 # symbols
 my $memptr = 0;
@@ -482,7 +483,7 @@ sub docmd {
     } elsif($cmdln =~/^\.$/) {
 	cmd_prline();
     } elsif($cmdln =~/^q$/) {
-	exit 0;
+	$running = 0;
     } elsif($cmdln =~/^s$/) {
 	foreach my $sym (sort keys %symtab) {
 	    my ($addr, $name) = @{$symtab{$sym}};
@@ -838,18 +839,18 @@ if(defined($datafile)) {
 
 $memptr = 0;
 $lineno = $mem[$memptr];
+
 if($inter) {
     my $term = Term::ReadLine->new('TACSIM');
     $term->ornaments(0);
     my $prompt = "tacsim\$ ";
     my $OUT = $term->OUT || \*STDOUT;
     cmd_prline();
-    while(1) {
+    while($running) {
 	last if( !defined ($_ = $term->readline($prompt)));
 	my $res = docmd($_);
 	$term->addhistory($_) if /\S/;
     }
-    print "\n";
 } else {
     cmd_go();
 }
