@@ -415,7 +415,7 @@ sub tac_jgt {
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
     prtrace("JGT", $argtrace) if $trace;
-    return ($cond{'N'} && !$cond{'Z'})? 0 : $res;
+    return $cond{'N'} || $cond{'Z'} ? 0 : $res;
 }    
 
 sub tac_jcs {
@@ -476,6 +476,7 @@ sub docmd {
     $cmdln =~ s/^\s+|\s+$//g;
     if($cmdln =~ /^\s*$/) {
 	doline() if !$halted;
+	cmd_prline();
     } elsif($cmdln =~/^\.$/) {
 	cmd_prline();
     } elsif($cmdln =~/^q$/) {
@@ -743,8 +744,10 @@ sub cmd_go {
 	# check breakpoint; doline returns -1 after last line
 	last if(($cnt++ && exists($brklst{$memptr})) || (doline() < 0)); 
     }
-    printf "TACSIM halted at Breakpint at $npic.\n", $memptr 
-	if exists $brklst{$memptr}
+    if(exists $brklst{$memptr}) {
+	printf "TACSIM halted at Breakpint at $npic.\n", $memptr;
+	cmd_prline();
+    }
 }
 
 # main
@@ -826,16 +829,10 @@ if($inter) {
     $term->ornaments(0);
     my $prompt = "tacsim\$ ";
     my $OUT = $term->OUT || \*STDOUT;
-    my $shown = -1;
+    cmd_prline();
     while(1) {
-	if($memptr != $shown) {
-	    cmd_prline();
-	    $shown = $memptr;
-	}
 	last if( !defined ($_ = $term->readline($prompt)));
 	my $res = docmd($_);
-	#warn $@ if $@;
-	#print $OUT $res, "\n" unless $@;
 	$term->addhistory($_) if /\S/;
     }
     print "\n";
