@@ -50,7 +50,7 @@ use Getopt::Long;
 use File::Slurp;
 
 # cmdline options
-my $bits = 10; # 10 bit, 1024 memory cells, max unsigned is 1023
+my $bits = 10; # defauklt: 10 bits, 1024 memory cells, max unsigned is 1023
 my ($srcfile, $helpme, $dumpstart, $punch, $trace, $quiet, $inter);
 
 GetOptions(
@@ -67,10 +67,10 @@ my ($srcfile, $endguard) = @ARGV;
 die qq/Usage: tacsim [ options ] srcfile
     -h             - this help
     -d <n>         - dump ten memloc starting at <n> after run
-    -p <addr, ...> - print mem loc from list may be symbols and arrays
+    -p <addr, ...> - print mem loc list (addrs, symbols and arrays) after run
     -t             - trace mode on
     -q             - quiet mode
-    -b <n>         - set word width to <n> bits (defaullt 10)
+    -b <n>         - set word width to <n> bits (default 10)
     -i             - enter interacive monitor after startup
 /
     if(!defined $srcfile || defined $endguard || defined $helpme);
