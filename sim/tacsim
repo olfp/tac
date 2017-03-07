@@ -100,6 +100,7 @@ my $halted = 0;
 # symbols
 my $memptr = 0;
 my %symtab = ();
+my %revtab;
 my %cond = ('Z' => 0, 'N' => 0, 'C' => 0);
 
 sub taceval {
@@ -173,8 +174,8 @@ sub tacargs {
 	    # print "SYMREF: $val, $mode, $dir\n";
 	    if($mode eq '*') {
 		# val is addr
-		$val = $mem[$val];
-		$trace .= "->$val" 
+		$val = $mem[$val];		
+		$trace .= "->" . (exists $revtab{$val} ? $revtab{$val} : "$val");
 	    } 
 	    if($mode ne '#' && $dir eq 'R') {
 		# reading,  direct and indirect
@@ -798,6 +799,10 @@ foreach my $line (@lines) {
 	$mem[$memptr++] = ($2 eq "MEM") ? $3 : $lineno;
     }
     $lineno++;
+}
+
+while(my($sym,  $val) = each(%symtab)) {
+    $revtab{$val->[0]} = $val->[1] . "(" . $val->[0] . ")";
 }
 
 =for comment
