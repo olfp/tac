@@ -513,7 +513,7 @@ sub docmd {
     } elsif($cmdln =~/^wc$/) {
 	cmd_clrwat();
     } elsif($cmdln =~/^[\?h]$/) {
-	print qq/TACSIM interactive mode:
+	my $th = qq/TACSIM interactive mode:
 	(addr can be number or symbol, symbols may have an offset)
 	<cr> \t\t- pressing return executes the next operation
 	. \t\t- print the current operation (not yet executed)
@@ -525,13 +525,13 @@ sub docmd {
 	bca \t\t- clear all breakpoints
 	l <a>[, <b>] \t- list source from addr <a> to <b>
 	d <a>[, <b>] \t- dump memory cells from addr <a> to <b>
-	p <a>[, <b> ..]\t- print mem at addrs, may be symbols or arrays
-	w <a>[, <b> ..]\t- watch mem at addrs, may be symbols or arrays
+	p <a>[, <b> ..]\t- print items, may be addrs, symbols or arrays
+	w <a>[, <b> ..]\t- watch items, like p, enter w ? for help
 	w \t\t- print list of watched items (printed on each break)
 	wc \t\t- cleat list of watched items
-	g [<a>] \t- go from addr <a> or current addr
-
-/;
+	g [<a>] \t- go from addr <a> or current addr\n/;
+	$th =~ s/\n\t/\n/g;
+	print $th;
     } else {
 	print "TACSIM: Unknown command or missing arguments: $cmdln\n";
     }
@@ -595,11 +595,12 @@ sub cmd_list {
     }
 }
 
-sub cmd_punch {
+sub symlist {
     my $locs = shift;
     my @loclst = split /,\s*/, $locs;
     my @locbas = ();
     my @cntlst = ();
+    my @symlst = ();
     foreach my $loc (@loclst) {
 	if($loc =~ /^(\w+)\[(.+)\]$/) {
 	    push @locbas, $1;
@@ -610,24 +611,23 @@ sub cmd_punch {
 	}
     }
     my @addrs = symres(@locbas);
-    foreach my $addr (@addrs) {
-	my $cnt = shift @cntlst;
-	print shift @loclst;
-	printf "\t($npic):", $addr;
-	for(my $i = 0; $i < $cnt; $i++) {
-	    printf " $npic", $mem[$addr++];
-	}
-	print "\n";
+    for(my $i; $i < scalar(@addrs); $i++) {
+	push @symlst, {
+	    addr  => $addrs[$i],
+	    base  => $locbas[$i],
+	    count => $cntlst[$i],
+	    ref   => $loclst[$i],
+	};
     }
+    return @symlst;
 }
 
-sub cmd_dump {
-    my ($first, $last) = symres(@_);
-    return if !defined $first;
-    $last = $first + 10 if !defined $last;
-    my $perln = int(70 / ($numlen+1));
+sub showmem {
+    my ($prompt, $first, $last) = @_;
+    $prompt = expand($prompt);
+    my $perln = int((79 - length($prompt)) / ($numlen+1)) - 1; # cells per line
     while($first <= $last) {
-	printf("$npic: ", $first);
+	printf("$prompt$npic: ", $first);
 	for(my $i = 0; $i < $perln; $i++) {
 	    if($first <= $last) {
 		printf("$npic ", $mem[$first]);
@@ -636,7 +636,22 @@ sub cmd_dump {
 	}
 	print "\n";
     }
-    print "\n";
+}
+
+sub cmd_punch {
+    my @symlst = symlist(shift); 
+    foreach my $sym (@symlst) {
+	my $first = $sym->{addr};
+	my $last = $first + $sym->{count} - 1;
+	showmem($sym->{ref} . "\t", $first, $last);
+    }
+}
+
+sub cmd_dump {
+    my ($first, $last) = symres(@_);
+    return if !defined $first;
+    $last = $first + 10 if !defined $last;
+    showmem("", $first, $last);
 }
 
 sub cmd_break {
@@ -675,25 +690,40 @@ sub cmd_lstbrk {
     }
 }
 
+sub cmd_clrwat {
+    $wchlst = "";
+    printf "TACSIM: Watchlist cleared.\n";
+}
+
+sub addwatch {
+    my @symlst = symlist(shift);
+    return join ', ', map { $_->{ref} } @symlst;
+}
+
 sub cmd_watch {
     my $wl = shift;
+    if($wl eq '?') {
+	my $wh = qq/Watch: Enter one or more addresses, symbols or arrays 
+	(symbols with subscript). Example: w n[3], a, b
+	The values referenced by these item will be output at each break.
+	To extend the existing watchlist use: w *, x, y
+	This adds x and y to the existing watchlist.\n/;
+	$wh =~ s/\t//g;
+	print $wh;
+	return;
+    }								 
     if($wl) {
-	if($wl =~ /^\*\s*(,.*)$/) {
-	    $wchlst .= $1;
+	if($wl =~ /^\*\s*,\s*(.*)$/) {
+	    $wchlst .= ($wl = addwatch($1) ? ", $1" : "");
 	} else {
-	    $wchlst = $wl;
+	    $wchlst = ($wl = addwatch($wl) ? $wl : $wchlst);
 	}
-	print "TACSIM: Now watching: $wchlst\n";
-    } elsif($wchlst) {
+    }
+    if($wchlst) {
 	print "TACSIM: Watching: $wchlst\n";
     } else {
 	print "TACSIM: No watchlist.\n";
     }
-}
-
-sub cmd_clrwat {
-    $wchlst = "";
-    printf "TACSIM: Watchlist cleared.\n";
 }
 
 sub cmd_go {
