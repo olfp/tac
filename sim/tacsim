@@ -52,10 +52,11 @@ use Text::Tabs;
 
 # cmdline options
 my $bits = 10; # default: 10 bits, 1024 memory cells, max unsigned is 1023
-my ($srcfile, $helpme, $dumpstart, $punch, $trace, $quiet, $inter);
+my ($srcfile, $datafile, $helpme, $dumpstart, $punch, $trace, $quiet, $inter);
 
 GetOptions(
     "help|?" => \$helpme,
+    "read=s" => \$datafile,
     "dump=s" => \$dumpstart,
     "punch=s" => \$punch,
     "trace" => \$trace,
@@ -67,6 +68,7 @@ GetOptions(
 my ($srcfile, $endguard) = @ARGV;
 die qq/Usage: tacsim [ options ] srcfile
     -h             - this help
+    -r <file\@addr> - read whitespace delimited numbers from file to addr
     -d <n>         - dump ten memloc starting at <n> after run
     -p <addr, ...> - print mem loc list (addrs, symbols and arrays) after run
     -t             - trace mode on
@@ -808,17 +810,29 @@ while(my($sym,  $val) = each(%symtab)) {
     $revtab{$val->[0]} = $val->[1] . "(" . $val->[0] . ")";
 }
 
-=for comment
-for(my $i=0; $i<3; $i++) {
-    my $l = $mem[$i];
-    printf "$npic L:%05d: ", $i, $l;
-    if(exists $lines[$l-1]) {
-	print $lines[$l-1] . "\n";
-    } else {
-	printf "\tMEM %d\n", $l;
+if(defined($datafile)) {
+    $datafile =~ /^(.*)\@(.*)$/;
+    my ($datanam, $datasym) = ($1, $2);
+
+    my ($dataloc) = symres(($datasym));
+    die "Fatal: Could not resolve data location $datasym.\n" 
+	if !defined $dataloc;
+    $datasym .= "($dataloc)" if($dataloc ne $datasym);
+    print "TACSIM: Reading data from $datanam to $datasym.\n" if !$quiet;
+    my $valstr = read_file($datanam, chomp => 1)
+	or die "Error: Cannot open datafile >$datanam< for reading.\n";
+    my @values = split /\s+/, $valstr;
+    my $datapos = $dataloc;
+    foreach my $val (@values) {
+	# printf "DATASET $npic: $npic\n", $datapos, $val;
+	$mem[$datapos++] = $val;
     }
+    # initialze data pointer
+    $symtab{DATPTR} = [$memptr, 'DATPTR'];
+    $mem[$memptr] = $dataloc;
+    # set DATA symbol for reset
+    $symtab{DATA} = [$dataloc, 'DATA'];
 }
-=cut
 
 # pass two, interpret
 
