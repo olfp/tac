@@ -1,3 +1,88 @@
 shlc is a shla (pronounced "shiela") compiler.
-This shlc compiles to tac code.
-shl is the simple high-level language.
+
+This shlc compiles to tac assembler. Shla is the simple high-level language.
+The shla syntax is vaguely C like, while simpler. There is only one
+datatype, the machine word (like BCPL). There are array (of words).
+
+var i, j <- 42, n[10];
+
+declares i (defaults to 0), j (initialized to 42) and n (an array with 10
+elements).
+
+There may be a data declaration (like in Fortran or Basic).
+
+data 1, 3, 5, 7, 11, 13;
+
+Defines six word the program can access with the read statement.
+
+Subroutines can be defined (and called later), but there are no local variables.
+
+sub myname { ... }
+
+Defines a subroutine named myname which can be called laster as
+
+call myname;
+
+The main routine is defined by
+
+main { ... }
+
+Within subroutines and the main routine the programm consits of a series
+of statements. These are either followed by a semicolon or a statement block.
+
+Assignment statement, allowing arbitrary expression on the right hand side.
+Supported operators are +, -, *, /.
+
+  a <- 2 * (i + 1);
+
+Loop statement, forming an endless loop around it's statement block:
+
+  loop { ... }
+
+The stop-on statement, for breaking out of the loop under certian
+conditions (see the if-else statement for supported relational operators):
+
+  stop on(i > 9);
+
+The if-else statement, allowing conditiona exection of one oftwo alternatives.
+The else part is optional. The supported relational operators
+are <, >, <=, >=, =, <> 
+
+  if(n > 10) { ... } else { ... }
+  if(i = 0) { ... }
+  
+The call statment, calling a subroutine, was already discussed.
+
+Comments start with // as go to the end of line (as in C++).
+
+There are no input or output statements or other provisions.
+
+Example program:
+
+// select odd number
+
+var n, half, res[10], i;
+
+data 1,2,3,4,5,6,7,-1;
+
+main {
+     i <- 0;
+     loop {
+     	  read n;
+	  stop on(n < 0);
+	  half <- n / 2;
+	  if(n <> half * 2) {
+	       res[i] <- n;
+	       i <- i + 1;
+	  }
+     }
+}
+
+// end
+
+You can compile this and run it in the tacsim simulator, like this:
+$ shlc testodd.shl -o testodd.tac
+$ tacsim -q testodd.tac -p res[10] 
+res[10] 0102: 0001 0003 0005 0007 0000 0000 0000 0000 0000 0000
+
+     

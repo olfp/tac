@@ -1,0 +1,20 @@
+// select odd number
+
+var n, half, res[10], i;
+
+data 1,2,3,4,5,6,7,-1;
+
+main {
+     i <- 0;
+     loop {
+     	  read n;
+	  stop on(n < 0);
+	  half <- n / 2;
+	  if(n <> half * 2) {
+	       res[i] <- n;
+	       i <- i + 1;
+	  }
+     }
+}
+
+// end
