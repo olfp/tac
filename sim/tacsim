@@ -3,8 +3,8 @@
 =for tac cpu
   tac - the three address code machine simulatur/interpreter
 
-  implements a virtual cpu with 4k memory holding values between 0 and 1023
-  and the following commands, involving up to three memory locations.
+  implements a virtual cpu with the following commands, involving up 
+  to three memory locations.
  
   The cpu consequently has not registers and the program counter is not
   user visible. Operations set conditions flags (zero, negative, carry)
@@ -14,9 +14,9 @@
   - leading asterisk (*) denotes indirection (ind), mem[mem[arg]]
   - leading hash (#) denotes immediate value (imm), arg
  
-  Addreviations:
-  - <imm-or-addr> : either #<imm> or <addr> or *<addr>
-  - <dir-or-ind>  : either <addr> or *<addr>
+  Address-Abbreviations:
+    <imm-or-addr> : either #<imm> or <addr> or *<addr>
+    <dir-or-ind>  : either <addr> or *<addr>
 
   Move first argument to second
     mov <imm-or-addr> <dir-or-ind> 

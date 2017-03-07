@@ -1,1 +1,36 @@
 This is the actual Three Adress Code simulator, tacsim.
+This implements a basic CPU with no registers and a memory to
+memory architecture. ALU operations set zero-, negative and carry flags.
+
+Each operation takes up to three operands which may be immediate (when
+the operands are read), denoted by a leading hash (#), direct addresses
+with no sigil or indirect addresses (i.e. the real address is at the location
+pointed to), denoted by a leading asterisk (*).
+
+Implemented operations:
+
+  Move first argument to second
+    mov <imm-or-addr> <dir-or-ind> 
+  Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
+    add <imm-or-addr> <imm-or-addr> <dir-or-addr>
+  Monadic arithmetic/logic (com[plement], not)
+    com <imm-or-addr> <dir-or-addr>
+  Bit shifting (of: logical or arithmentc, shift or rotate, left or right, 
+  with or without carry)
+  Implemented: logical shift/rotate left/right with carry
+  Commands: shl/shr/rol/ror
+    shl <imm-or-addr> <dir-or-addr>
+  Compare (like sub but only sets flag)
+    cmp <imm-or-addr> <imm-or-addr>
+  Branching (jmp, jeq (equal, i.e. cmp yields zero), jne (not equal), 
+    jle (less, i.e. cmp yields negative), jgt (greater), 
+    jcs (carry set), jcc (carry clear) 
+    jmp <addr>, jsr  <addr> (move retvec <addr>, jmp <addr+1>)
+  Miscelaeneous: Clear carry flag, no-operation, halt
+    clc
+    nop
+    hlt
+
+  Address-Abbreviations:
+    <imm-or-addr> : either #<imm> or <addr> or *<addr>
+    <dir-or-ind>  : either <addr> or *<addr>

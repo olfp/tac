@@ -57,9 +57,11 @@ Comments start with // as go to the end of line (as in C++).
 
 There are no input or output statements or other provisions.
 
+Reserved words are MAIN, DATA, DATPTR, RESET and L00001 to L99999.
+
 Example program:
 
-// select odd number
+// select odd numbers
 
 var n, half, res[10], i;
 
