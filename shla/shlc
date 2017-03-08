@@ -25,14 +25,15 @@ vardecl: /- 'var' -/ declinit+ %% COMMA /- SEMI -/
 declinit: assign | declare
 declare: variable dimension?
 dimension: /- LSQUARE -/ cardinal /- RSQUARE -/
-subdecl: /- 'sub' -/ subname block
-subname: variable
+subdecl: /- 'sub' -/ subsign block
+subsign: variable /- LPAREN -/ variable* %% COMMA /- RPAREN -/
 main: /- 'main'/
 
 # statements
 statements:  statement*
 statement: assignstmt | readstmt | datareset | control | subcall
-subcall: /- 'call' -/ variable /- SEMI/
+subcall: /- 'call' -/ variable params /- SEMI/
+params: /- LPAREN -/ expr* %% COMMA /- RPAREN -/
 control: if | loop | stopon
 assignstmt: assign /- SEMI -/
 assign: variable /- '<-' -/ expr
@@ -92,17 +93,38 @@ cardinal: /- ( DIGIT+ )/
     my @ilabels = ();
     my @llabels = ();
     my @slabels = ();
+    my %locsym = ();
     my $haslbl = 0;
     my $isdecl = 0;
-    
+    my $cursub = undef;
+
+    sub localvar {
+	my $var = shift;
+	my $adv = shift;
+	# print "LOCSYM $cursub:$var: " . Dumper(%locsym);
+	if(exists $locsym{"$cursub:$var"}) {
+	    my $frmpos = $locsym{"$cursub:$var"};
+	    print "\t" if !$haslbl;
+	    print "SUB FRMPTR #$frmpos $t\n";
+	    $haslbl = 0;
+	    $var = "*$t";
+	}
+	if($adv) {
+	    $t++;
+	}
+	return $var;
+    }
+
     sub initial {
 	$maxnum =  (1 << $main::bits) - 1;
 	# print "MAXNUM: $maxnum bits $main::bits\n";
 	print "; shlc SHLA compilation " . localtime() . "\n";
 	print "; this assumes a TAC with $main::bits bit word width\n";
-	print "; mem locs 10-99 are temp vars for expr eval\n";
+	print "; mem locs 1-255 are local local or temporary vars\n";
 	print "RESET:\tJMP MAIN\n";
-	print ".=\t100\n";
+	print "STKPTR:\tMEM 255\n";
+	print "FRMPTR:\tMEM 255\n";
+	print ".=\t256\n";
 	$isdecl = 1;
 
         my ($self, $list) = @_;
@@ -153,8 +175,10 @@ cardinal: /- ( DIGIT+ )/
 	    if($isdecl) {
 		print "$var=\tMEM $val\n";
 	    } else {
+		$var = localvar($var);
 		$val = "#$val" if($val =~ /^\d/);
 		$val =~ s/^@(\d+)/$1/;
+		$val = localvar($val);
 		print "\t" if !$haslbl;
 		print "MOV $val $var\n";
 		$haslbl = 0;
@@ -273,36 +297,67 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
-    sub got_subname {
+    sub got_subsign {
         my ($self, $list) = @_;
-	my $name = $list;
-	printf "%-6s\tMEM 0\n", "$name:";
-	push @slabels, $name;
-
 	return $list unless ref $list;
+	# print "SUBSIGN: " . join('/', @$list) . "\n";
+
+	my $frmpos = 0;
+	while (@$list > 1) {
+	    my ($name, $params) = splice(@$list, 0, 2);
+	    # print "SUBPARA $name: " . Dumper(@$params);
+	    foreach my $obj (@$params) {
+		if(defined $obj) {
+		    my $locnam = "$name:$obj";
+		    # print "LOCAL $locnam\n";
+		    $locsym{$locnam} = $frmpos++;
+		}
+	    }
+
+	    printf "%-6s\tMEM 0\n", "$name:";
+	    push @slabels, $name;       
+	    unshift @$list, "#$frmpos";
+	    $cursub = $name;
+	}
+
 	return @$list;
     }
 
     sub got_subdecl {
         my ($self, $list) = @_;
         return $list unless ref $list;
-	#print Dumper(@$list);
+	# print "SUBDECL: " . join('/', @$list) . "\n";
+	while (@$list > 0) {
+	    my ($frmoff) = splice(@$list, 0, 1);
+	    printf "\tADD STKPTR $frmoff STKPTR\n" 
+		if($frmoff && $frmoff ne '#0');
+	}
 
 	my $sub = pop @slabels;
 	printf "\tJMP *%s\n", $sub;
+	$cursub = undef;
+	
 	return @$list;
     }
 
     sub got_subcall {
         my ($self, $list) = @_;
         return $list unless ref $list;
-	#print "CALL: " . join('/', @$list) . "\n";
+	# print "CALL: " . join('/', @$list) . "\n";
 
  	while (@$list > 0) {
-	    my ($var) = splice(@$list, 0, 1);
+	    my ($name, $params) = splice(@$list, 0, 2);
+	    # print "CALL PARAMS: " . Dumper($params);
 	    print "\t" if !$haslbl;
-	    printf "JSR %s\n", $var;
-	    $haslbl = 1;
+	    print "MOV STKPTR FRMPTR\n"; 
+	    foreach my $obj (@$params) {
+		if(defined $obj) {
+		    print "\tMOV #$obj *STKPTR\n";
+		    print "\tSUB STKPTR #1 STKPTR\n";
+		}
+	    }
+	    printf "\tJSR %s\n", $name;
+	    $haslbl = 0;
 	}
         return @$list;
     }
@@ -357,6 +412,8 @@ cardinal: /- ( DIGIT+ )/
 	    $a =~ s/^@(\d+)/$1/;
 	    $b = "#$b" if($b =~ /^\d/);
 	    $b =~ s/^@(\d+)/$1/;
+	    $a = localvar($a, 1);
+	    $b = localvar($b);
 	    print "\t" if !$haslbl;
 	    print $opcode{$op} . " $a $b $t\n";
 	    $haslbl = 0;
@@ -401,17 +458,19 @@ cardinal: /- ( DIGIT+ )/
 
 	    while (@$list > 1) {
 		my ($var, $idx) = splice(@$list, 0, 2);
+		$var = localvar($var);
 		if($idx =~ /^(@)?(\d+)/) {
 		    $idx = ($1 eq '\@') ? $1 : "#$2";
 		}
-		if($idx eq '#0') {
-		    unshift @$list, "$var";
-		} else {
-		    print "\t" if !$haslbl;
-		    print "ADD #$var $idx $t\n";
-		    $haslbl = 0;
-		    unshift @$list, "*$t"; $t++;
-		}
+		#if($idx eq '#0') {
+		#    unshift @$list, "$var";
+		#} else {
+		$var = "#$var" unless($var =~ /^\*/);
+		print "\t" if !$haslbl;
+		print "ADD $var $idx $t\n";
+		$haslbl = 0;
+		unshift @$list, "*$t"; $t++;
+		#}
 	    }
 	}
         return @$list;
