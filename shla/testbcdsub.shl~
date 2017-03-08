@@ -1,0 +1,50 @@
+//
+// Test for BCD arithmetic with SHLA
+// First round: One dight per mem cell
+// In-memory format is one count word and <count> digit words
+//
+
+var vals[22],a[10], b[10], c[10], d, e, x, y, u, i;
+
+main {
+  // read b
+  i <- 1;
+  loop {
+    read d;
+    stop on(d > 9);
+    b[i] <- d;
+    i <- i + 1;
+  }
+  b[0] <- i - 1;
+  // compute a + b
+  i <- 1;
+  u <- 0;
+  e <- 0;
+  loop {
+    x <- a[i];
+    if(a[0] < i) {
+      x <- 0;
+      e <- e + 1;
+    }
+    y <- b[i];
+    if(b[0] < i) {
+      y <- 0;
+      e <- e + 1;
+    }
+    stop on(e > 1);
+    d <- x + y + u;		// sum digits and carry
+    if(d > 9) {		 	// overflow
+      u <- 1;			// new carry
+      d <- d - 10;		// digit is 9
+    } else {
+      u <- 0;
+    }
+    c[i] <- d;
+    i <- i + 1;
+  }
+  if(u > 0) {
+    c[i] <- u;			// final carry is msd
+    i <- i + 1;
+  }
+  c[0] <- i - 1;		// result digit count
+}

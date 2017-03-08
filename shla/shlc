@@ -401,11 +401,17 @@ cardinal: /- ( DIGIT+ )/
 
 	    while (@$list > 1) {
 		my ($var, $idx) = splice(@$list, 0, 2);
-		$idx =~ s/^@(\d+)/$1/;
-		print "\t" if !$haslbl;
-		print "ADD #$var $idx $t\n";
-		$haslbl = 0;
-		unshift @$list, "*$t"; $t++;
+		if($idx =~ /^(@)?(\d+)/) {
+		    $idx = ($1 eq '\@') ? $1 : "#$2";
+		}
+		if($idx eq '#0') {
+		    unshift @$list, "$var";
+		} else {
+		    print "\t" if !$haslbl;
+		    print "ADD #$var $idx $t\n";
+		    $haslbl = 0;
+		    unshift @$list, "*$t"; $t++;
+		}
 	    }
 	}
         return @$list;
