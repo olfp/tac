@@ -1,9 +1,10 @@
-; shlc SHLA compilation Wed Mar  8 12:35:58 2017
+; shlc SHLA compilation Thu Mar  9 10:40:22 2017
 ; this assumes a TAC with 10 bit word width
-; mem locs 10-99 are temp vars for expr eval
+; mem locs 1-255 are local local or temporary vars
 RESET:	JMP MAIN
-.=	100
-vals=	MEM 0*22
+STKPTR:	MEM 255
+FRMPTR:	MEM 255
+.=	256
 a=	MEM 0*10
 b=	MEM 0*10
 c=	MEM 0*10
@@ -20,67 +21,73 @@ L00001:	MOV *DATPTR d
 	JGT L00002
 	ADD #a i 10
 	MOV d *10
-	ADD i #1 11
-	MOV 11 i
+	ADD i #1 12
+	MOV @12 i
 	JMP L00001
-L00002:	SUB i #1 12
-	MOV 12 a
+L00002:	ADD #a #0 13
+	SUB i #1 15
+	MOV @15 *13
 	MOV #1 i
 L00003:	MOV *DATPTR d
 	ADD DATPTR #1 DATPTR
 	CMP d #9
 	JGT L00004
-	ADD #b i 13
-	MOV d *13
-	ADD i #1 14
-	MOV 14 i
+	ADD #b i 16
+	MOV d *16
+	ADD i #1 18
+	MOV @18 i
 	JMP L00003
-L00004:	SUB i #1 15
-	MOV 15 b
+L00004:	ADD #b #0 19
+	SUB i #1 21
+	MOV @21 *19
 	MOV #1 i
 	MOV #0 u
 	MOV #0 e
-L00005:	ADD #a i 16
-	MOV *16 x
-	CMP a i
+L00005:	ADD #a i 22
+	MOV *22 x
+	ADD #a #0 23
+	CMP *23 i
 	JEQ L00006
 	JGT L00006
 	MOV #0 x
-	ADD e #1 17
-	MOV 17 e
-L00006:	ADD #b i 18
-	MOV *18 y
-	CMP b i
+	ADD e #1 25
+	MOV @25 e
+L00006:	ADD #b i 26
+	MOV *26 y
+	ADD #b #0 27
+	CMP *27 i
 	JEQ L00007
 	JGT L00007
 	MOV #0 y
-	ADD e #1 19
-	MOV 19 e
+	ADD e #1 29
+	MOV @29 e
 L00007:	CMP e #1
 	JGT L00008
-	ADD x y 20
-	ADD 20 u 21
-	MOV 21 d
+	ADD x y 31
+	ADD @31 u 33
+	MOV @33 d
 	CMP d #9
 	JEQ L00009
 	JLE L00009
 	MOV #1 u
-	SUB d #10 22
-	MOV 22 d
+	SUB d #10 35
+	MOV @35 d
 	JMP L00010
 L00009:	MOV #0 u
-L00010:	ADD #c i 23
-	MOV d *23
-	ADD i #1 24
-	MOV 24 i
+L00010:	ADD #c i 36
+	MOV d *36
+	ADD i #1 38
+	MOV @38 i
 	JMP L00005
 L00008:	CMP u #0
 	JEQ L00011
 	JLE L00011
-	ADD #c i 25
-	MOV u *25
-	ADD i #1 26
-	MOV 26 i
-L00011:	SUB i #1 27
-	MOV 27 c
+	ADD #c i 39
+	MOV u *39
+	ADD i #1 41
+	MOV @41 i
+L00011:	ADD #c #0 42
+	SUB i #1 44
+	MOV @44 *42
 	HLT
+HEAP:	MEM 0

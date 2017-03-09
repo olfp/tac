@@ -4,8 +4,9 @@ memory architecture. ALU operations set zero-, negative and carry flags.
 
 Each operation takes up to three operands which may be immediate (when
 the operands are read), denoted by a leading hash (#), direct addresses
-with no sigil or indirect addresses (i.e. the real address is at the location
-pointed to), denoted by a leading asterisk (*).
+with either no sigil or an optional at-sign (@) and indirect addresses
+(i.e. the real address is at the location pointed to), denoted by a
+leading asterisk (*).
 
   Address-Abbreviations:
     <imm-or-addr> : either #<imm> or <addr> or *<addr>
@@ -42,6 +43,20 @@ Implemented operations:
     hlt
 
 tacsim features an extensive interactive mode. It implements a monitor
-where the program can be single stepped and examined. On program start a
-data file may be read into a specified address range and after program
-termination data contents may be printed.
+where the program can be single stepped and examined.
+
+On program start a data file may be read into a specified address range
+and after program termination data contents may be printed. This can
+either be configured via the -r (read), -p (print) and -d (dump) command
+line switches to the tacsim command or embeded in the source code via
+#pragma pseudo-ops.
+
+  #pragma read <file@addr>
+  #pragma dump <addr>,<addr>
+  #pragma dump <addr>,+<cnt>
+  #pragma dump <addr>
+  #pragma print <list of variables, array, addresses>
+
+Note that the argument to the pragma may not contain spaces!
+
+

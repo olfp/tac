@@ -11,22 +11,23 @@ use Getopt::Long;
 my $grammar = <<'...';
 # Precedence Climbing grammar:
 program: declarations main begin statements end
+
 # General Tokens
-escape: / [0nt] /
 line: / ANY* EOL /
-blanks: / BLANK+ /
-blank-line: / BLANK* EOL /
 comment: / '//' line /
 ws: /(: BLANK | EOL | comment )/
 
+# declarations
 declarations: vardecls*
-vardecls: vardecl | datastmt | subdecl
+vardecls: pragma | vardecl | datastmt | subdecl
+pragma: /- HASH 'pragma' - name - ( NS+ ) -/
 vardecl: /- 'var' -/ declinit+ %% COMMA /- SEMI -/
 declinit: assign | declare
 declare: variable dimension?
 dimension: /- LSQUARE -/ cardinal /- RSQUARE -/
 subdecl: /- 'sub' -/ subsign block
-subsign: variable /- LPAREN -/ variable* %% COMMA /- RPAREN -/
+subsign: name /- LPAREN -/ formparam* %% COMMA /- RPAREN -/
+formparam: (/- 'val' -/)? variable
 main: /- 'main'/
 
 # statements
@@ -68,6 +69,7 @@ addsub: muldiv+ % /- ( [ '+-' ])/
 muldiv: token+ % /- ([ '*/' ])/
 token: /- LPAREN -/ expr /- RPAREN/ | number | variable
 variable: /- ( ALPHA WORD* ) / index?
+name: /- ( ALPHA WORD* ) /
 index: /- LSQUARE -/ expr /- RSQUARE -/
 number: /- ( '-'? DIGIT+ )/
 cardinal: /- ( DIGIT+ )/
@@ -98,18 +100,25 @@ cardinal: /- ( DIGIT+ )/
     my $isdecl = 0;
     my $cursub = undef;
 
-    sub localvar {
+    sub scope {
 	my $var = shift;
-	my $adv = shift;
+	my $para = shift;
 	# print "LOCSYM $cursub:$var: " . Dumper(%locsym);
-	if(exists $locsym{"$cursub:$var"}) {
-	    my $frmpos = $locsym{"$cursub:$var"};
+	if($var =~ /^\d+/) {
+	    return "#$var";
+	}
+	my $locnam = "$cursub:$var";
+	if(exists $locsym{$locnam}) {
+	    my $frmpos = $locsym{$locnam};
 	    print "\t" if !$haslbl;
 	    print "SUB FRMPTR #$frmpos $t\n";
+	    if($para =~ /lvalue/) {
+		print "\tMOV *$t $t\n";
+	    }
 	    $haslbl = 0;
 	    $var = "*$t";
 	}
-	if($adv) {
+	if($para =~ /persist/) {
 	    $t++;
 	}
 	return $var;
@@ -133,16 +142,8 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
-    sub got_vardecls {
-	$isdecl = 0;
-    
-        my ($self, $list) = @_;
-        return $list unless ref $list;
-
-        return @$list;
-    }
-
     sub got_main {
+	$isdecl = 0;
 	print "MAIN:\t";
 	$haslbl = 1;
     
@@ -154,10 +155,11 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_declare {
         my ($self, $list) = @_;
+	# print "VARDECL: " . Dumper($list);
         return $list unless ref $list;
 	my ($var, $dim) = splice(@$list, 0, 2);
 
-	#print "DECL: $var - $dim\n";
+	# print "DECL: $var - $dim\n";
 	my $val = 0;
 	$val = "0*$dim" if $dim;
 	if($isdecl) {
@@ -175,10 +177,8 @@ cardinal: /- ( DIGIT+ )/
 	    if($isdecl) {
 		print "$var=\tMEM $val\n";
 	    } else {
-		$var = localvar($var);
-		$val = "#$val" if($val =~ /^\d/);
-		$val =~ s/^@(\d+)/$1/;
-		$val = localvar($val);
+		$var = scope($var, 'lvalue');
+		$val = scope($val);
 		print "\t" if !$haslbl;
 		print "MOV $val $var\n";
 		$haslbl = 0;
@@ -245,9 +245,7 @@ cardinal: /- ( DIGIT+ )/
 	}
 	print "\t" if !$haslbl;
 	$a = "#$a" if($a =~ /^\d/);
-	$a =~ s/^@(\d+)/$1/;
 	$b = "#$b" if($b =~ /^\d/);
-	$b =~ s/^@(\d+)/$1/;
 	print "CMP $a $b\n";
 	foreach my $jump (@jumps) {
 	    print "\t$jump $endlop\n";
@@ -298,6 +296,7 @@ cardinal: /- ( DIGIT+ )/
     }
 
     sub got_subsign {
+	$isdecl = 0;
         my ($self, $list) = @_;
 	return $list unless ref $list;
 	# print "SUBSIGN: " . join('/', @$list) . "\n";
@@ -324,6 +323,7 @@ cardinal: /- ( DIGIT+ )/
     }
 
     sub got_subdecl {
+	$isdecl = 1;
         my ($self, $list) = @_;
         return $list unless ref $list;
 	# print "SUBDECL: " . join('/', @$list) . "\n";
@@ -348,11 +348,22 @@ cardinal: /- ( DIGIT+ )/
  	while (@$list > 0) {
 	    my ($name, $params) = splice(@$list, 0, 2);
 	    # print "CALL PARAMS: " . Dumper($params);
-	    print "\t" if !$haslbl;
-	    print "MOV STKPTR FRMPTR\n"; 
+	    my $myfrm = $t++;
+	    print "\t" if !$haslbl;	   
+	    print "MOV FRMPTR $myfrm\n"; 
+	    print "\tMOV STKPTR FRMPTR\n"; 
 	    foreach my $obj (@$params) {
 		if(defined $obj) {
-		    print "\tMOV #$obj *STKPTR\n";
+		    my $locnam = "$name:$obj";
+		    if(exists $locsym{$locnam}) {
+			my $frmpos = $locsym{$locnam};
+			print "\tSUB $myfrm #$frmpos $t\n";
+			print "\tMOV *$t $t\n";
+			$obj = "$t";
+		    } else {
+			$obj = "#$obj";
+		    }
+		    print "\tMOV $obj *STKPTR\n";
 		    print "\tSUB STKPTR #1 STKPTR\n";
 		}
 	    }
@@ -408,12 +419,8 @@ cardinal: /- ( DIGIT+ )/
 
 	while (@$list > 1) {
 	    my ($a, $op, $b) = splice(@$list, 0, 3);
-	    $a = "#$a" if($a =~ /^\d/);
-	    $a =~ s/^@(\d+)/$1/;
-	    $b = "#$b" if($b =~ /^\d/);
-	    $b =~ s/^@(\d+)/$1/;
-	    $a = localvar($a, 1);
-	    $b = localvar($b);
+	    $a = scope($a, 'persist');
+	    $b = scope($b);
 	    print "\t" if !$haslbl;
 	    print $opcode{$op} . " $a $b $t\n";
 	    $haslbl = 0;
@@ -450,7 +457,7 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_variable {
         my ($self, $list) = @_;
-	# print "VAR: " . Dumper($list);
+	#print "VAR: " . Dumper($list);
         return $list unless ref $list;
 
 	if(!$isdecl) {
@@ -458,19 +465,14 @@ cardinal: /- ( DIGIT+ )/
 
 	    while (@$list > 1) {
 		my ($var, $idx) = splice(@$list, 0, 2);
-		$var = localvar($var);
-		if($idx =~ /^(@)?(\d+)/) {
-		    $idx = ($1 eq '\@') ? $1 : "#$2";
-		}
-		#if($idx eq '#0') {
-		#    unshift @$list, "$var";
-		#} else {
+		$var = scope($var);
+		$idx = "#$idx" if($idx =~/^\d+/);
+		# use addr not content if not pointer
 		$var = "#$var" unless($var =~ /^\*/);
 		print "\t" if !$haslbl;
 		print "ADD $var $idx $t\n";
 		$haslbl = 0;
 		unshift @$list, "*$t"; $t++;
-		#}
 	    }
 	}
         return @$list;
@@ -536,6 +538,15 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
+    sub got_pragma {
+        my ($self, $list) = @_;
+        return $list unless ref $list;
+	my ($name, $body) = splice(@$list, 0, 2);
+	print "#PRAGMA\t$name $body\n";
+
+        return @$list;
+    }
+    
     sub gotrule {
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -548,11 +559,15 @@ cardinal: /- ( DIGIT+ )/
 	print "\t" if !$haslbl;
 	$haslbl = 0;
 	print "HLT\n";
+	print "HEAP:\tMEM 0\n";
         my ($self, $list) = @_;
         return $list unless ref $list;
 
         return @$list;
     }	
+}
+
+sub preprocess {
 }
 
 # cmdline options

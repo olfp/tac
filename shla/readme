@@ -56,15 +56,24 @@ are <, >, <=, >=, =, <>
   
 The call statment, calling a subroutine, was already discussed.
 
+Commands can be passed to the simulator by embedding #pragma command in
+the declaration part. This allows to read data before starting the programm
+and printing data afterward. For printing ten word starting at label res:
+
+  #pragma print res[10]
+
 Comments start with // as go to the end of line (as in C++).
 
 There are no input or output statements or other provisions.
 
 Reserved words are MAIN, DATA, DATPTR, RESET and L00001 to L99999.
 
+
 Example program:
 
 // select odd numbers
+
+#pragma print res[10]
 
 var n, half, res[10], i;
 

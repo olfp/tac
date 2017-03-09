@@ -4,7 +4,10 @@
 // In-memory format is one count word and <count> digit words
 //
 
-var vals[22], z1[10], z2[10], res[10], d, e, x, y, u, i;
+#pragma read bcd.dat@heap
+#pragma print z1[10],z2[10],res[10]
+
+var z1[10], z2[10], res[10], d, e, x, y, u, i;
 
 sub readbcd(v, l) {
   // read bcd from data

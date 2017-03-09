@@ -52,12 +52,12 @@ use Text::Tabs;
 
 # cmdline options
 my $bits = 10; # default: 10 bits, 1024 memory cells, max unsigned is 1023
-my ($srcfile, $datafile, $helpme, $dumpstart, $punch, $trace, $quiet, $inter);
+my ($srcfile, $datafile, $helpme, $dumps, $punch, $trace, $quiet, $inter);
 
 GetOptions(
     "help|?" => \$helpme,
     "read=s" => \$datafile,
-    "dump=s" => \$dumpstart,
+    "dump=s" => \$dumps,
     "punch=s" => \$punch,
     "trace" => \$trace,
     "quiet" => \$quiet,
@@ -129,7 +129,7 @@ sub taceval {
 	    } else {
 		# its an arg
 		# print "ARG $word\n";
-		if($word =~ /^([#*]?)(\S+)$/) {
+		if($word =~ /^([#*\@]?)(\S+)$/) {
 		    @val = [$2, $1]; # value, mode
 		} else {
 		    # empty word
@@ -461,9 +461,9 @@ sub prtrace {
 sub doline {
     my $line = $lines[$mem[$memptr]-1]; # lines start at 1
     if($line =~ /^.=\s+(\d+)/) {
-	# mem ptr assignement, set and quit processing line
-	#$memptr = $1;
-	#$lineno++;   
+	# mem ptr assignement, done in first pass
+    } elsif($line =~/^#pragma/i) {
+	# pragma, processed in first pass
     } else {
 	taceval($line);
     }
@@ -753,6 +753,22 @@ sub cmd_go {
     }
 }
 
+sub dopragma {
+    my ($what, $args) = @_;
+    if($what =~ /^dump$/i) {
+	# print "PRAGMA dump $args\n";
+	$dumps = $args;
+    } elsif($what =~/^print$/i) {
+	# print "PRAGMA print $args\n";
+	$punch = $args;
+    } elsif($what =~/^read$/i) {
+	# print "PRAGMA read $args\n";
+	$datafile = $args;
+    } else {
+	print "TACSIM: WARN: Unknown PRAGMA $what.\n";
+    }
+}
+
 # main
 if(defined($srcfile)) {
     print "TACSIM: Reading input from $srcfile.\n" if !$quiet;
@@ -766,6 +782,11 @@ foreach my $line (@lines) {
     $line =~ s/;.*$//; # remove comments
     #printf "$npic L:%05d: $line\n", $memptr, $lineno;
     my $setmem = 1;
+    if($line =~ /^#pragma\s+(\w+)\s+(.*)$/i) {
+	dopragma($1, $2);
+	$lineno++;
+	next;
+    }
     if($line =~ /^((?|[[:alpha:]]|\.)[[:alnum:]]*)([:=])\s+(\S+)(\s+(\S+))?/) {
 	# print "SYM: $1 $2 /$3/ /$4/ $5\n";
 	# label or memory assignemt
@@ -812,27 +833,32 @@ while(my($sym,  $val) = each(%symtab)) {
 }
 
 if(defined($datafile)) {
-    $datafile =~ /^(.*)\@(.*)$/;
-    my ($datanam, $datasym) = ($1, $2);
-
-    my ($dataloc) = symres(($datasym));
-    die "Fatal: Could not resolve data location $datasym.\n" 
-	if !defined $dataloc;
-    $datasym .= "($dataloc)" if($dataloc ne $datasym);
-    print "TACSIM: Reading data from $datanam to $datasym.\n" if !$quiet;
-    my $valstr = read_file($datanam, chomp => 1)
-	or die "Error: Cannot open datafile >$datanam< for reading.\n";
-    my @values = split /\s+/, $valstr;
-    my $datapos = $dataloc;
-    foreach my $val (@values) {
-	# printf "DATASET $npic: $npic\n", $datapos, $val;
-	$mem[$datapos++] = $val;
+    if(exists $symtab{DATA}) {
+	print "TACSIM: ERROR: DATA section in program, cannot read DATA from file.\n";
+    } else {
+	$datafile =~ /^(.*)\@(.*)$/;
+	my ($datanam, $datasym) = ($1, $2);
+	
+	my ($dataloc) = symres(($datasym));
+	die "Fatal: Could not resolve data location $datasym.\n" 
+	    if !defined $dataloc;
+	$datasym .= "($dataloc)" if($dataloc ne $datasym);
+	print "TACSIM: Reading data from $datanam to $datasym.\n" if !$quiet;
+	my $valstr = read_file($datanam, chomp => 1)
+	    or die "Error: Cannot open datafile >$datanam< for reading.\n";
+	
+	# initialze data pointer
+	$symtab{DATPTR} = [$dataloc, 'DATPTR'];
+	$mem[$dataloc] = $dataloc + 1;
+	# set DATA symbol for reset
+	$symtab{DATA} = [++$dataloc, 'DATA'];
+	
+	my @values = split /\s+/, $valstr;
+	foreach my $val (@values) {
+	    # printf "DATASET $npic: $npic\n", $dataloc, $val;
+	    $mem[$dataloc++] = $val;
+	}
     }
-    # initialze data pointer
-    $symtab{DATPTR} = [$memptr, 'DATPTR'];
-    $mem[$memptr] = $dataloc;
-    # set DATA symbol for reset
-    $symtab{DATA} = [$dataloc, 'DATA'];
 }
 
 # pass two, interpret
@@ -855,8 +881,12 @@ if($inter) {
     cmd_go();
 }
 
-if(defined $dumpstart) {
-    cmd_dump($dumpstart);
+if(defined $dumps) {
+    if($dumps =~ /^(\S+)\s*,\s*(\S+)\s*$/) {
+	cmd_dump($1, $2);
+    } else {
+	cmd_dump($dumps);
+    }
 }
 
 if(defined $punch) {
