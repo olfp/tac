@@ -35,9 +35,10 @@ Within subroutines and the main routine the programm consits of a series
 of statements. These are either followed by a semicolon or a statement block.
 
 Assignment statement, allowing arbitrary expression on the right hand side.
-Supported operators are +, -, *, /.
+Supported operators are +, -, *, /, &, |, ^ plus unary - and !.
 
   a <- 2 * (i + 1);
+  k <- l & !m;
 
 Loop statement, forming an endless loop around it's statement block:
 
