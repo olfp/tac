@@ -66,7 +66,7 @@ begin: /- LCURLY -/
 end: /- RCURLY -/
 
 # expressions
-expr: /- ( ['-!']? ) / addsub
+expr: /- ( ['-!<>']? ) / addsub
 addsub: muldiv+ % /- ( [ '+-|^' ])/
 muldiv: token+ % /- ([ '*/&' ])/
 token: /- LPAREN -/ expr /- RPAREN/ | number | variable
@@ -497,6 +497,30 @@ cardinal: /- ( DIGIT+ )/
 		    ## SCOPE
 		    $v = "#$v" if($v =~ /^\d/);
 		    print "NOT $v $t\n";
+		    $haslbl = 0;
+		    unshift @$list, "\@$t"; $t++;
+		}
+	    } elsif($s eq '<') {
+		if($isdecl) {
+		    my $sv = ($v << 1) & $maxnum;
+		    unshift @$list, $sv;
+		} else {
+		    print "\t" if !$haslbl;
+		    ## SCOPE
+		    $v = "#$v" if($v =~ /^\d/);
+		    print "SHL $v $t\n";
+		    $haslbl = 0;
+		    unshift @$list, "\@$t"; $t++;
+		}
+	    } elsif($s eq '>') {
+		if($isdecl) {
+		    my $sv = ($v >> 1) & $maxnum;
+		    unshift @$list, $sv;
+		} else {
+		    print "\t" if !$haslbl;
+		    ## SCOPE
+		    $v = "#$v" if($v =~ /^\d/);
+		    print "SHR $v $t\n";
 		    $haslbl = 0;
 		    unshift @$list, "\@$t"; $t++;
 		}
