@@ -503,7 +503,7 @@ sub docmd {
 	}
     } elsif($cmdln =~/^g(\s+(\S+))?$/) {
 	cmd_go($2);
-    } elsif($cmdln =~/^d\s+(\S+)\s*(,\s*(\+?\S+))?$/) {
+    } elsif($cmdln =~/^d\s+([^,\s]+)\s*(,\s*(\+?\S+))?$/) {
 	cmd_dump($1, $3);
     } elsif($cmdln =~/^b\s+(\S+)$/) {
 	cmd_break($1);
