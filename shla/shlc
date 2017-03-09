@@ -27,7 +27,9 @@ declare: variable dimension?
 dimension: /- LSQUARE -/ cardinal /- RSQUARE -/
 subdecl: /- 'sub' -/ subsign block
 subsign: name /- LPAREN -/ formparam* %% COMMA /- RPAREN -/
-formparam: (/- 'val' -/)? variable
+formparam: (valparam | refparam)
+valparam: (/- 'val' -/) variable
+refparam: (/- 'ref' -/)? variable
 main: /- 'main'/
 
 # statements
@@ -109,14 +111,16 @@ cardinal: /- ( DIGIT+ )/
 	}
 	my $locnam = "$cursub:$var";
 	if(exists $locsym{$locnam}) {
-	    my $frmpos = $locsym{$locnam};
+	    my ($frmpos, $cby) = @{$locsym{$locnam}};
 	    print "\t" if !$haslbl;
 	    print "SUB FRMPTR #$frmpos $t\n";
-	    if($para =~ /lvalue/) {
-		print "\tMOV *$t $t\n";
-	    }
+	    print "\tMOV *$t $t\n" if($cby eq 'ref');
 	    $haslbl = 0;
-	    $var = "*$t";
+	    if($para =~ /array/) {
+		$var = "\@$t"
+	    } else {
+		$var = "*$t"
+	    }
 	}
 	if($para =~ /persist/) {
 	    $t++;
@@ -244,6 +248,7 @@ cardinal: /- ( DIGIT+ )/
 	    die "FATAL: Undefined relational operator '$rel'.\n";
 	}
 	print "\t" if !$haslbl;
+	## SCOPE?
 	$a = "#$a" if($a =~ /^\d/);
 	$b = "#$b" if($b =~ /^\d/);
 	print "CMP $a $b\n";
@@ -295,6 +300,28 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
+    sub got_valparam {
+        my ($self, $list) = @_;
+	return $list unless ref $list;
+	# print "VALPP: " . join('/', @$list) . "\n";
+	my ($name) = splice(@$list, 0, 1);
+
+	unshift @$list, "val:$name";
+
+        return @$list;
+    }
+
+    sub got_refparam {
+        my ($self, $list) = @_;
+	return $list unless ref $list;
+	# print "REFP: " . join('/', @$list) . "\n";
+	my ($name) = splice(@$list, 0, 1);
+
+	unshift @$list, "ref:$name";
+	
+        return @$list;
+    }
+
     sub got_subsign {
 	$isdecl = 0;
         my ($self, $list) = @_;
@@ -307,15 +334,17 @@ cardinal: /- ( DIGIT+ )/
 	    # print "SUBPARA $name: " . Dumper(@$params);
 	    foreach my $obj (@$params) {
 		if(defined $obj) {
-		    my $locnam = "$name:$obj";
-		    # print "LOCAL $locnam\n";
-		    $locsym{$locnam} = $frmpos++;
+		    my ($cby, $var) = split /:/, $obj;
+		    my $locnam = "$name:$var";
+		    # print "LOCAL $cby $locnam\n";
+		    $locsym{$locnam} = [$frmpos++, $cby];
 		}
 	    }
 
 	    printf "%-6s\tMEM 0\n", "$name:";
-	    push @slabels, $name;       
-	    unshift @$list, "#$frmpos";
+	    push @slabels, $name;
+	    $frmpos = "#$frmpos" unless($frmpos =~/^\@/);
+	    unshift @$list, "$frmpos";
 	    $cursub = $name;
 	}
 
@@ -329,7 +358,8 @@ cardinal: /- ( DIGIT+ )/
 	# print "SUBDECL: " . join('/', @$list) . "\n";
 	while (@$list > 0) {
 	    my ($frmoff) = splice(@$list, 0, 1);
-	    printf "\tADD STKPTR $frmoff STKPTR\n" 
+	    # printf "\tADD STKPTR $frmoff STKPTR\n"
+	    print "\tMOV FRMPTR STKPTR\n"
 		if($frmoff && $frmoff ne '#0');
 	}
 
@@ -354,14 +384,15 @@ cardinal: /- ( DIGIT+ )/
 	    print "\tMOV STKPTR FRMPTR\n"; 
 	    foreach my $obj (@$params) {
 		if(defined $obj) {
-		    my $locnam = "$name:$obj";
+		    # print "CHECKLOC: $cursub:$obj\n";
+		    my $locnam = "$cursub:$obj";
 		    if(exists $locsym{$locnam}) {
-			my $frmpos = $locsym{$locnam};
+			my ($frmpos, $cby) = @{$locsym{$locnam}};
 			print "\tSUB $myfrm #$frmpos $t\n";
-			print "\tMOV *$t $t\n";
+			print "\tMOV *$t $t\n" if($cby eq 'ref');
 			$obj = "$t";
 		    } else {
-			$obj = "#$obj";
+			$obj = "#$obj" unless($obj =~ /^\@/);
 		    }
 		    print "\tMOV $obj *STKPTR\n";
 		    print "\tSUB STKPTR #1 STKPTR\n";
@@ -442,6 +473,7 @@ cardinal: /- ( DIGIT+ )/
 		    unshift @$list, $cv;
 		} else {
 		    print "\t" if !$haslbl;
+		    ## SCOPE
 		    $v = "#$v" if($v =~ /^\d/);
 		    print "COM $v $t\n";
 		    $haslbl = 0;
@@ -465,10 +497,12 @@ cardinal: /- ( DIGIT+ )/
 
 	    while (@$list > 1) {
 		my ($var, $idx) = splice(@$list, 0, 2);
-		$var = scope($var);
+		#print "PreScope: $var $idx\n";
+		$var = scope($var, 'array');
+		#print "PostScope: $var $idx\n";
 		$idx = "#$idx" if($idx =~/^\d+/);
 		# use addr not content if not pointer
-		$var = "#$var" unless($var =~ /^\*/);
+		$var = "#$var" unless($var =~ /^[\*\@]/);
 		print "\t" if !$haslbl;
 		print "ADD $var $idx $t\n";
 		$haslbl = 0;

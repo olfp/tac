@@ -499,17 +499,17 @@ sub docmd {
 	}
     } elsif($cmdln =~/^g(\s+(\S+))?$/) {
 	cmd_go($2);
-    } elsif($cmdln =~/^d\s+(\w+)\s*(,\s*(\+?\w+))?$/) {
+    } elsif($cmdln =~/^d\s+(\S+)\s*(,\s*(\+?\S+))?$/) {
 	cmd_dump($1, $3);
-    } elsif($cmdln =~/^b\s+(\w+)$/) {
+    } elsif($cmdln =~/^b\s+(\S+)$/) {
 	cmd_break($1);
-    } elsif($cmdln =~/^bc\s+(\w+)$/) {
+    } elsif($cmdln =~/^bc\s+(\S+)$/) {
 	cmd_clrbrk($1);
     } elsif($cmdln =~/^bca$/) {
 	cmd_clrall();
     } elsif($cmdln =~/^bl$/) {
 	cmd_lstbrk($1);
-    } elsif($cmdln =~/^l\s+(\w+)\s*(,\s*(\+?\w+))?$/) {
+    } elsif($cmdln =~/^l\s+(\S+)\s*(,\s*(\+?\S+))?$/) {
 	cmd_list($1, $3);
     } elsif($cmdln =~/^p\s+(\S+.*)$/) {
 	cmd_punch($1);
