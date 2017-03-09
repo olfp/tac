@@ -17,14 +17,15 @@ Defines six word the program can access with the read statement.
 
 Subroutines can be defined (and called later), but there are no local variables.
 
-sub myname(p, q, ...) { ... }
+sub myname(ref p, val q, ...) { ... }
 
-Defines a subroutine named myname with formal parameters p and q which
-can be called laster with actual parameters as
+Defines a subroutine named myname with formal parameters p and q. Parameters
+can be pass as value (val, the default) or reference (ref). When passing array
+they mus be passed as ref (else only the first value will be correct).
+
+Subroutines can be called later with actual parameters as
 
 call myname(u, v, ...);
-
-The parameters are passed by reference.
 
 The main routine is defined by
 

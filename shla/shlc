@@ -27,9 +27,9 @@ declare: variable dimension?
 dimension: /- LSQUARE -/ cardinal /- RSQUARE -/
 subdecl: /- 'sub' -/ subsign block
 subsign: name /- LPAREN -/ formparam* %% COMMA /- RPAREN -/
-formparam: (valparam | refparam)
-valparam: (/- 'val' -/) variable
-refparam: (/- 'ref' -/)? variable
+formparam: (refparam | valparam)
+refparam: (/- 'ref' -/) variable
+valparam: (/- 'val' -/)? variable
 main: /- 'main'/
 
 # statements
@@ -66,9 +66,9 @@ begin: /- LCURLY -/
 end: /- RCURLY -/
 
 # expressions
-expr: /- ( '-'? ) / addsub
-addsub: muldiv+ % /- ( [ '+-' ])/
-muldiv: token+ % /- ([ '*/' ])/
+expr: /- ( ['-!']? ) / addsub
+addsub: muldiv+ % /- ( [ '+-|^' ])/
+muldiv: token+ % /- ([ '*/&' ])/
 token: /- LPAREN -/ expr /- RPAREN/ | number | variable
 variable: /- ( ALPHA WORD* ) / index?
 name: /- ( ALPHA WORD* ) /
@@ -87,8 +87,11 @@ cardinal: /- ( DIGIT+ )/
     my %opcode = (
 	'+' => 'ADD',
 	'-' => 'SUB',
+	'|' => 'IOR',
+	'^' => 'XOR',
 	'*' => 'MUL',
 	'/' => 'DIV',
+	'&' => 'AND',
 	'<-' => 'MOV',
 	);
 
@@ -332,14 +335,17 @@ cardinal: /- ( DIGIT+ )/
 	while (@$list > 1) {
 	    my ($name, $params) = splice(@$list, 0, 2);
 	    # print "SUBPARA $name: " . Dumper(@$params);
+	    my @callmode = (); 
 	    foreach my $obj (@$params) {
 		if(defined $obj) {
 		    my ($cby, $var) = split /:/, $obj;
+		    push @callmode, $cby;
 		    my $locnam = "$name:$var";
 		    # print "LOCAL $cby $locnam\n";
 		    $locsym{$locnam} = [$frmpos++, $cby];
 		}
 	    }
+	    $locsym{$name} = \@callmode;
 
 	    printf "%-6s\tMEM 0\n", "$name:";
 	    push @slabels, $name;
@@ -381,18 +387,21 @@ cardinal: /- ( DIGIT+ )/
 	    my $myfrm = $t++;
 	    print "\t" if !$haslbl;	   
 	    print "MOV FRMPTR $myfrm\n"; 
-	    print "\tMOV STKPTR FRMPTR\n"; 
+	    print "\tMOV STKPTR FRMPTR\n";
+	    my @callmode = @{$locsym{$name}}; 
 	    foreach my $obj (@$params) {
 		if(defined $obj) {
-		    # print "CHECKLOC: $cursub:$obj\n";
+		    my $cm = shift @callmode;
 		    my $locnam = "$cursub:$obj";
+		    # print "CHECKLOC: $locnam $cm\n";
 		    if(exists $locsym{$locnam}) {
 			my ($frmpos, $cby) = @{$locsym{$locnam}};
 			print "\tSUB $myfrm #$frmpos $t\n";
-			print "\tMOV *$t $t\n" if($cby eq 'ref');
+			print "\tMOV *$t $t\n" unless($cby eq 'val');
 			$obj = "$t";
 		    } else {
-			$obj = "#$obj" unless($obj =~ /^\@/);
+			$obj = "#$obj" unless(($obj =~ /^\@/) or ($cm eq 'val'));
+			$obj = "#$obj" if($obj =~ /^\d+/);
 		    }
 		    print "\tMOV $obj *STKPTR\n";
 		    print "\tSUB STKPTR #1 STKPTR\n";
@@ -476,6 +485,18 @@ cardinal: /- ( DIGIT+ )/
 		    ## SCOPE
 		    $v = "#$v" if($v =~ /^\d/);
 		    print "COM $v $t\n";
+		    $haslbl = 0;
+		    unshift @$list, "\@$t"; $t++;
+		}
+	    } elsif($s eq '!') {
+		if($isdecl) {
+		    my $iv = !$v & $maxnum;
+		    unshift @$list, $iv;
+		} else {
+		    print "\t" if !$haslbl;
+		    ## SCOPE
+		    $v = "#$v" if($v =~ /^\d/);
+		    print "NOT $v $t\n";
 		    $haslbl = 0;
 		    unshift @$list, "\@$t"; $t++;
 		}

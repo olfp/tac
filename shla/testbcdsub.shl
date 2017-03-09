@@ -9,7 +9,7 @@
 
 var z1[10], z2[10], res[10], d, e, x, y, u, i;
 
-sub readbcd(v, l) {
+sub readbcd(ref v, l) {
   // read bcd from data
   i <- 1;
   loop {
@@ -21,7 +21,7 @@ sub readbcd(v, l) {
   v[0] <- i - 1;
 }
 
-sub sumbcd(a, b, c) {
+sub sumbcd(ref a, ref b, ref c) {
   i <- 1;
   u <- 0;
   e <- 0;
@@ -59,4 +59,5 @@ main {
   call readbcd(z2, 10);  
   // compute a + b
   call sumbcd(z1, z2, res);
+  res <- !23;      
 }

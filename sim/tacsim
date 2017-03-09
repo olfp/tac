@@ -52,6 +52,7 @@ use Text::Tabs;
 
 # cmdline options
 my $bits = 10; # default: 10 bits, 1024 memory cells, max unsigned is 1023
+my $fmt = 'd'; # number output defaults to decimal
 my ($srcfile, $datafile, $helpme, $dumps, $punch, $trace, $quiet, $inter);
 
 GetOptions(
@@ -62,6 +63,7 @@ GetOptions(
     "trace" => \$trace,
     "quiet" => \$quiet,
     "bits=i" => \$bits,
+    "format=s" => \$fmt,
     "interactive" => \$inter,
     ) or die("Fatal error: Cannot understand options\n");
 
@@ -74,17 +76,19 @@ die qq/Usage: tacsim [ options ] srcfile
     -t             - trace mode on
     -q             - quiet mode
     -b <n>         - set word width to <n> bits (default 10)
+    -f [dxo]       - set number output format to dec, oct, hex
     -i             - enter interacive monitor after startup
 /
     if(!defined $srcfile || defined $endguard || defined $helpme);
 
+die "TACSIM: Fatal: Bad output format specifier: $fmt.\n" if("dxo" !~ /$fmt/);
 # machine size
 my $maxcells = 1 << $bits; 
 my $maxlines = $maxcells;
 
 # formating
-my $numlen = length("" . ($maxcells - 1));
-my $npic = "%0${numlen}d";
+my $numlen = length(sprintf "%$fmt", ($maxcells - 1));
+my $npic = "%0${numlen}$fmt";
 my $tpic = "%0${numlen}s";
 my $spic = "%-${numlen}s";
 my $tab  = "        ";
@@ -509,7 +513,7 @@ sub docmd {
 	cmd_clrall();
     } elsif($cmdln =~/^bl$/) {
 	cmd_lstbrk($1);
-    } elsif($cmdln =~/^l\s+(\S+)\s*(,\s*(\+?\S+))?$/) {
+    } elsif($cmdln =~/^l\s+([^,\s]+)\s*(,\s*(\+?\S+))?$/) {
 	cmd_list($1, $3);
     } elsif($cmdln =~/^p\s+(\S+.*)$/) {
 	cmd_punch($1);
