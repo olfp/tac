@@ -716,17 +716,17 @@ sub cmd_watch {
 	my $wh = qq/Watch: Enter one or more addresses, symbols or arrays 
 	(symbols with subscript). Example: w n[3], a, b
 	The values referenced by these item will be output at each break.
-	To extend the existing watchlist use: w *, x, y
-	This adds x and y to the existing watchlist.\n/;
+	Issuing more than one watch command appends to the watchlist.
+	Use the wc command to cleat the watchlist.\n/;
 	$wh =~ s/\t//g;
 	print $wh;
 	return;
     }								 
-    if($wl) {
-	if($wl =~ /^\*\s*,\s*(.*)$/) {
-	    $wchlst .= ($wl = addwatch($1) ? ", $1" : "");
+    if($wl && ($wl = addwatch($wl))) {
+	if(!$wchlst) {
+	    $wchlst = $wl;
 	} else {
-	    $wchlst = ($wl = addwatch($wl) ? $wl : $wchlst);
+	    $wchlst = join ', ', ($wchlst, $wl);
 	}
     }
     if($wchlst) {
