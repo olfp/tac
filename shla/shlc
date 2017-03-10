@@ -97,7 +97,9 @@ cardinal: /- ( DIGIT+ )/
 	'<-' => 'MOV',
 	);
 
-    my $t = 10; # start of tmp cells
+    my $toff = 16; # start of tmp ringbuf
+    my $t = $toff; # pointer in tmp ringbuf
+    my $tlen = 16; # length of tmp ringbuf
     my $labelno = 0;
     my @ilabels = ();
     my @llabels = ();
@@ -107,6 +109,10 @@ cardinal: /- ( DIGIT+ )/
     my $isdecl = 0;
     my $cursub = undef;
 
+    sub ringbuft {
+	return (($t + 1) % $tlen) + $toff;
+    }
+    
     sub scope {
 	my $var = shift;
 	my $para = shift;
@@ -128,7 +134,7 @@ cardinal: /- ( DIGIT+ )/
 	    }
 	}
 	if($para =~ /persist/) {
-	    $t++;
+	    $t = ringbuft();
 	}
 	return $var;
     }
@@ -385,7 +391,7 @@ cardinal: /- ( DIGIT+ )/
  	while (@$list > 0) {
 	    my ($name, $params) = splice(@$list, 0, 2);
 	    # print "CALL PARAMS: " . Dumper($params);
-	    my $myfrm = $t++;
+	    my $myfrm = ringbuft();
 	    print "\t" if !$haslbl;	   
 	    print "MOV FRMPTR $myfrm\n"; 
 	    print "\tMOV STKPTR FRMPTR\n";
@@ -473,7 +479,7 @@ cardinal: /- ( DIGIT+ )/
 		$b = scope($b);
 		print "$opc $a $b $t\n";
 	    }
-	    unshift @$list, "\@$t"; $t++;
+	    unshift @$list, "\@$t"; ringbuft();
 	    $haslbl = 0;
 	}
         return @$list;
@@ -495,7 +501,7 @@ cardinal: /- ( DIGIT+ )/
 		    print "\t" if !$haslbl;
 		    print "COM $v $t\n";
 		    $haslbl = 0;
-		    unshift @$list, "\@$t"; $t++;
+		    unshift @$list, "\@$t"; ringbuft();
 		}
 	    } elsif($s eq '!') {
 		if($isdecl) {
@@ -506,7 +512,7 @@ cardinal: /- ( DIGIT+ )/
 		    print "\t" if !$haslbl;
 		    print "NOT $v $t\n";
 		    $haslbl = 0;
-		    unshift @$list, "\@$t"; $t++;
+		    unshift @$list, "\@$t"; ringbuft();
 		}
 	    } else {
 		unshift @$list, $v;
@@ -535,7 +541,7 @@ cardinal: /- ( DIGIT+ )/
 		print "\t" if !$haslbl;
 		print "ADD $var $idx $t\n";
 		$haslbl = 0;
-		unshift @$list, "*$t"; $t++;
+		unshift @$list, "*$t"; ringbuft();
 	    }
 	}
         return @$list;

@@ -519,9 +519,14 @@ sub docmd {
 	cmd_watch($2);
     } elsif($cmdln =~/^wc$/) {
 	cmd_clrwat();
+    } elsif($cmdln =~/^e\s+([^,\s]+)\s+(\S+.*)?$/) {
+	cmd_setmem($1, $2);
+    } elsif($cmdln =~/^z\s+([^,\s]+)\s*(,\s*(\+?\S+))?$/) {
+	cmd_zeromem($1, $3);
     } elsif($cmdln =~/^[\?h]$/) {
 	my $th = qq/TACSIM interactive mode:
-	(addr can be number or symbol, symbols may have an offset)
+	(addr can be number or symbol, symbols may have an offset.
+	When entering from to range second value may be +x)
 	<cr> \t\t- pressing return executes the next operation
 	. \t\t- print the current operation (not yet executed)
 	t \t\t- toggle trace mode on or off
@@ -536,6 +541,8 @@ sub docmd {
 	w <a>[, <b> ..]\t- watch items, like p, enter w ? for help
 	w \t\t- print list of watched items (printed on each break)
 	wc \t\t- cleat list of watched items
+	e <a> <v>[,<v>]\t- enter values into memory beginning at addr <a>
+	z <a>[, <b>] \t-zero memory from addr <a> to <b>
 	g [<a>] \t- go from addr <a> or current addr\n/;
 	$th =~ s/\n\t/\n/g;
 	print $th;
@@ -662,6 +669,24 @@ sub cmd_dump {
     return if !defined $first;
     $last = $first + 10 if !defined $last;
     showmem("", $first, $last);
+}
+
+sub cmd_zeromem {
+    my ($first, $last) = symres(@_);
+    return if !defined $first;
+    $last = $first + 10 if !defined $last;
+    for(my $addr = $first; $addr <= $last; $addr++) {
+	$mem[$addr] = undef;
+    }
+}
+
+sub cmd_setmem {
+    my ($addr, $list) = @_;
+    ($addr) = symres(($addr));
+    return if !defined $addr;
+    foreach my $item (split /[\s,]+/, $list) {
+	$mem[$addr++] = $item;
+    }
 }
 
 sub cmd_break {
