@@ -87,12 +87,10 @@ my $maxcells = 1 << $bits;
 my $maxlines = $maxcells;
 
 # formating
-my $numlen = length(sprintf "%$fmt", ($maxcells - 1));
-my $npic = "%0${numlen}$fmt";
-my $tpic = "%0${numlen}s";
-my $spic = "%-${numlen}s";
-my $tab  = "        ";
-my $lab  = "%-8s";
+my %pfxmap = ('d' => '', 'x' => '0x', 'o' => '0');
+my $pfx = $pfxmap{$fmt};
+my ($numlen, $npic, $tpic, $spic);
+bitsize($bits, 'defaults');
 
 # data mem and prog lines
 my @mem = (); 
@@ -553,11 +551,14 @@ sub symres {
     my $last = 0;
     foreach my $addr (@toks) {
 	next if $addr =~ /^$/;
-	if($addr =~ /^(\+?)(\d+)$/) {
+	if($addr =~ /^(\+?)([0-9]+)$/ or $addr =~ /^(\+?)(?:0x)([0-9a-f]+)$/i) {
+	    my $num = $2;
+	    $num =~ s/^0+//;
+	    $num = eval "$pfx$num"; 
 	    if($1 eq '+') {
-		$this = $last + $2;
+		$this = $last + $num;
 	    } else {
-		$this = $2;
+		$this = $num;
 	    }
 	} else {
 	    my $offs = 0;
@@ -581,7 +582,7 @@ sub symres {
 
 sub printline {
     my ($loc, $prompt) = @_;
-    if($wchlst) {
+    if($wchlst && !defined $prompt) {
 	cmd_punch($wchlst);
     }
     $prompt = "NEXTOP> " if !defined $prompt;
@@ -768,9 +769,25 @@ sub dopragma {
     } elsif($what =~/^read$/i) {
 	# print "PRAGMA read $args\n";
 	$datafile = $args;
+    } elsif($what =~/^bits$/i) {
+	# print "PRAGMA bits $args\n";
+	bitsize($args);
     } else {
 	print "TACSIM: WARN: Unknown PRAGMA $what.\n";
     }
+}
+
+sub bitsize {
+    my ($nb, $msg) = @_;
+    $bits = $nb;
+    $msg = 'set' unless $msg;
+    $maxcells = 1 << $bits; 
+    $maxlines = $maxcells;
+    $numlen = length(sprintf "%$fmt", ($maxcells - 1));
+    $npic = "%0${numlen}$fmt";
+    $tpic = "%0${numlen}s";
+    $spic = "%-${numlen}s";
+    print "TACSIM: Bitsize $msg to $bits.\n" unless $quiet;
 }
 
 # main

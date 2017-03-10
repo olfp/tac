@@ -190,8 +190,8 @@ cardinal: /- ( DIGIT+ )/
 		$val = scope($val);
 		print "\t" if !$haslbl;
 		print "MOV $val $var\n";
-		$haslbl = 0;
 	    }
+	    $haslbl = 0;
 	}
         return @$list;
     }
@@ -243,11 +243,11 @@ cardinal: /- ( DIGIT+ )/
 	    push @jumps, ($doorgo ? 'JEQ' : 'JNE');
 	} elsif($rel eq '>') {
 	    push @jumps, ($doorgo ? ('JEQ', 'JLE') : 'JGT');
-	} elsif($rel eq '=>') {
+	} elsif($rel eq '=>' or $rel eq '>=') {
 	    push @jumps, ($doorgo ? 'JLE' : ('JEQ', 'JGT'));
 	} elsif($rel eq '<') {
 	    push @jumps, ($doorgo ? ('JEQ', 'JGT') : 'JLE');
-	} elsif($rel eq '<=') {
+	} elsif($rel eq '<=' or $rel eq '=<') {
 	    push @jumps, ($doorgo ? 'JGT' : ('JEQ', 'JLE'));
 	} else {
 	    die "FATAL: Undefined relational operator '$rel'.\n";
@@ -466,6 +466,9 @@ cardinal: /- ( DIGIT+ )/
 	    if($opc =~ /^SH[LR]$/) {
 		$a = scope($a);
 		print "$opc $a $t\n";
+		for(my $n = $b - 1; $n > 0; $n--) {
+		    print "\t$opc $t $t\n";
+		}
 	    } else {
 		$a = scope($a, 'persist');
 		$b = scope($b);
@@ -606,6 +609,13 @@ cardinal: /- ( DIGIT+ )/
         return $list unless ref $list;
 	my ($name, $body) = splice(@$list, 0, 2);
 	print "#PRAGMA\t$name $body\n";
+	if($name eq 'bits') {
+	    if($body =~ /^\d+$/) {
+		$main::bits = $body;
+	    } else {
+		die "Fatal: Not a wordsize in bits: $body.\n";
+	    }
+	}
 
         return @$list;
     }
