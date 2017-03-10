@@ -252,10 +252,9 @@ cardinal: /- ( DIGIT+ )/
 	} else {
 	    die "FATAL: Undefined relational operator '$rel'.\n";
 	}
+	$a = scope($a);
+	$b = scope($b);
 	print "\t" if !$haslbl;
-	## SCOPE?
-	$a = "#$a" if($a =~ /^\d/);
-	$b = "#$b" if($b =~ /^\d/);
 	print "CMP $a $b\n";
 	foreach my $jump (@jumps) {
 	    print "\t$jump $endlop\n";
@@ -492,9 +491,8 @@ cardinal: /- ( DIGIT+ )/
 		    my $cv = -$v & $maxnum;
 		    unshift @$list, $cv;
 		} else {
+		    $v = scope($v);
 		    print "\t" if !$haslbl;
-		    ## SCOPE
-		    $v = "#$v" if($v =~ /^\d/);
 		    print "COM $v $t\n";
 		    $haslbl = 0;
 		    unshift @$list, "\@$t"; $t++;
@@ -504,9 +502,8 @@ cardinal: /- ( DIGIT+ )/
 		    my $iv = !$v & $maxnum;
 		    unshift @$list, $iv;
 		} else {
+		    $v = scope($v);
 		    print "\t" if !$haslbl;
-		    ## SCOPE
-		    $v = "#$v" if($v =~ /^\d/);
 		    print "NOT $v $t\n";
 		    $haslbl = 0;
 		    unshift @$list, "\@$t"; $t++;
