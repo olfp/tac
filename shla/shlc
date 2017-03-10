@@ -66,9 +66,9 @@ begin: /- LCURLY -/
 end: /- RCURLY -/
 
 # expressions
-expr: /- ( ['-!<>']? ) / addsub
+expr: /- ( ['-!']? ) / addsub
 addsub: muldiv+ % /- ( [ '+-|^' ])/
-muldiv: token+ % /- ([ '*/&' ])/
+muldiv: token+ % /- ([ '*/&' ] | '<<' | '>>' )/
 token: /- LPAREN -/ expr /- RPAREN/ | number | variable
 variable: /- ( ALPHA WORD* ) / index?
 name: /- ( ALPHA WORD* ) /
@@ -92,6 +92,8 @@ cardinal: /- ( DIGIT+ )/
 	'*' => 'MUL',
 	'/' => 'DIV',
 	'&' => 'AND',
+	'<<' => 'SHL',
+	'>>' => 'SHR',
 	'<-' => 'MOV',
 	);
 
@@ -459,12 +461,18 @@ cardinal: /- ( DIGIT+ )/
 
 	while (@$list > 1) {
 	    my ($a, $op, $b) = splice(@$list, 0, 3);
-	    $a = scope($a, 'persist');
-	    $b = scope($b);
+	    my $opc = $opcode{$op};
 	    print "\t" if !$haslbl;
-	    print $opcode{$op} . " $a $b $t\n";
-	    $haslbl = 0;
+	    if($opc =~ /^SH[LR]$/) {
+		$a = scope($a);
+		print "$opc $a $t\n";
+	    } else {
+		$a = scope($a, 'persist');
+		$b = scope($b);
+		print "$opc $a $b $t\n";
+	    }
 	    unshift @$list, "\@$t"; $t++;
+	    $haslbl = 0;
 	}
         return @$list;
     }
@@ -497,30 +505,6 @@ cardinal: /- ( DIGIT+ )/
 		    ## SCOPE
 		    $v = "#$v" if($v =~ /^\d/);
 		    print "NOT $v $t\n";
-		    $haslbl = 0;
-		    unshift @$list, "\@$t"; $t++;
-		}
-	    } elsif($s eq '<') {
-		if($isdecl) {
-		    my $sv = ($v << 1) & $maxnum;
-		    unshift @$list, $sv;
-		} else {
-		    print "\t" if !$haslbl;
-		    ## SCOPE
-		    $v = "#$v" if($v =~ /^\d/);
-		    print "SHL $v $t\n";
-		    $haslbl = 0;
-		    unshift @$list, "\@$t"; $t++;
-		}
-	    } elsif($s eq '>') {
-		if($isdecl) {
-		    my $sv = ($v >> 1) & $maxnum;
-		    unshift @$list, $sv;
-		} else {
-		    print "\t" if !$haslbl;
-		    ## SCOPE
-		    $v = "#$v" if($v =~ /^\d/);
-		    print "SHR $v $t\n";
 		    $haslbl = 0;
 		    unshift @$list, "\@$t"; $t++;
 		}
@@ -644,9 +628,6 @@ cardinal: /- ( DIGIT+ )/
 
         return @$list;
     }	
-}
-
-sub preprocess {
 }
 
 # cmdline options

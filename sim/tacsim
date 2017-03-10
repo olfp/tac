@@ -764,7 +764,7 @@ sub dopragma {
 	$dumps = $args;
     } elsif($what =~/^print$/i) {
 	# print "PRAGMA print $args\n";
-	$punch = $args;
+	$punch = $punch ? "$punch,$args" : $args;
     } elsif($what =~/^read$/i) {
 	# print "PRAGMA read $args\n";
 	$datafile = $args;
