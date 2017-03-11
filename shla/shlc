@@ -376,7 +376,9 @@ cardinal: /- ( DIGIT+ )/
 	    #	if($frmoff && $frmoff ne '#0');
 	#}
 	print "\tMOV FRMPTR STKPTR\n";
-
+	print "\tADD STKPTR #1 STKPTR\n";
+	print "\tMOV *STKPTR FRMPTR\n";
+	    
 	my $sub = pop @slabels;
 	printf "\tJMP *%s\n", $sub;
 	$cursub = undef;
@@ -394,7 +396,9 @@ cardinal: /- ( DIGIT+ )/
 	    # print "CALL PARAMS: " . Dumper($params);
 	    my $myfrm = $t; ringbuft();
 	    print "\t" if !$haslbl;	   
-	    print "MOV FRMPTR $myfrm\n"; 
+	    print "MOV FRMPTR $myfrm\n";
+	    print "MOV FRMPTR *STKPTR\n";
+	    print "\tSUB STKPTR #1 STKPTR\n";
 	    print "\tMOV STKPTR FRMPTR\n";
 	    my @callmode = @{$locsym{$name}}; 
 	    foreach my $obj (@$params) {
