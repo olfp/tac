@@ -356,6 +356,10 @@ cardinal: /- ( DIGIT+ )/
 	    $locsym{$name} = \@callmode;
 
 	    printf "%-6s\tMEM 0\n", "$name:";
+	    # put in reserved slot at FRMPTR +1
+	    print "\tADD FRMPTR #1 $t\n";
+	    print "\tMOV $name *$t\n";
+	    
 	    push @slabels, $name;
 	    $frmpos = "#$frmpos" unless($frmpos =~/^\@/);
 	    unshift @$list, "$frmpos";
@@ -375,12 +379,18 @@ cardinal: /- ( DIGIT+ )/
 	    # printf "\tADD STKPTR $frmoff STKPTR\n"
 	    #	if($frmoff && $frmoff ne '#0');
 	#}
+	# restore stack ptr (to prev frame)
 	print "\tMOV FRMPTR STKPTR\n";
+	# pop return addr
+	print "\tADD STKPTR #1 STKPTR\n";
+	print "\tMOV *STKPTR $t\n";
+	# pop prev. frame ptr
 	print "\tADD STKPTR #1 STKPTR\n";
 	print "\tMOV *STKPTR FRMPTR\n";
 	    
 	my $sub = pop @slabels;
-	printf "\tJMP *%s\n", $sub;
+	#printf "\tJMP *%s\n", $sub;
+	printf "\tJMP *$t\n";
 	$cursub = undef;
 	
 	return @$list;
@@ -397,8 +407,10 @@ cardinal: /- ( DIGIT+ )/
 	    my $myfrm = $t; ringbuft();
 	    print "\t" if !$haslbl;	   
 	    print "MOV FRMPTR $myfrm\n";
-	    print "MOV FRMPTR *STKPTR\n";
-	    print "\tSUB STKPTR #1 STKPTR\n";
+	    # push frame ptr, leave one word for ret addr
+	    print "\tMOV FRMPTR *STKPTR\n";
+	    print "\tSUB STKPTR #2 STKPTR\n";
+	    # start new frame
 	    print "\tMOV STKPTR FRMPTR\n";
 	    my @callmode = @{$locsym{$name}}; 
 	    foreach my $obj (@$params) {
