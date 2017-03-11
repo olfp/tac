@@ -110,12 +110,13 @@ cardinal: /- ( DIGIT+ )/
     my $cursub = undef;
 
     sub ringbuft {
-	return (($t + 1) % $tlen) + $toff;
+	$t = (($t + 1) % $tlen) + $toff;
     }
     
     sub scope {
 	my $var = shift;
 	my $para = shift;
+	my $isarray = ($para =~ /array/);
 	# print "LOCSYM $cursub:$var: " . Dumper(%locsym);
 	if($var =~ /^\d+/) {
 	    return "#$var";
@@ -127,14 +128,14 @@ cardinal: /- ( DIGIT+ )/
 	    print "SUB FRMPTR #$frmpos $t\n";
 	    print "\tMOV *$t $t\n" if($cby eq 'ref');
 	    $haslbl = 0;
-	    if($para =~ /array/) {
+	    if($isarray) {
 		$var = "\@$t"
 	    } else {
 		$var = "*$t"
 	    }
 	}
 	if($para =~ /persist/) {
-	    $t = ringbuft();
+	    ringbuft();
 	}
 	return $var;
     }
@@ -369,12 +370,12 @@ cardinal: /- ( DIGIT+ )/
         my ($self, $list) = @_;
         return $list unless ref $list;
 	# print "SUBDECL: " . join('/', @$list) . "\n";
-	while (@$list > 0) {
-	    my ($frmoff) = splice(@$list, 0, 1);
+	#while (@$list > 0) {
+	    # my ($frmoff) = splice(@$list, 0, 1);
 	    # printf "\tADD STKPTR $frmoff STKPTR\n"
-	    print "\tMOV FRMPTR STKPTR\n"
-		if($frmoff && $frmoff ne '#0');
-	}
+	    #	if($frmoff && $frmoff ne '#0');
+	#}
+	print "\tMOV FRMPTR STKPTR\n";
 
 	my $sub = pop @slabels;
 	printf "\tJMP *%s\n", $sub;
@@ -391,7 +392,7 @@ cardinal: /- ( DIGIT+ )/
  	while (@$list > 0) {
 	    my ($name, $params) = splice(@$list, 0, 2);
 	    # print "CALL PARAMS: " . Dumper($params);
-	    my $myfrm = ringbuft();
+	    my $myfrm = $t; ringbuft();
 	    print "\t" if !$haslbl;	   
 	    print "MOV FRMPTR $myfrm\n"; 
 	    print "\tMOV STKPTR FRMPTR\n";
@@ -476,7 +477,7 @@ cardinal: /- ( DIGIT+ )/
 		}
 	    } else {
 		$a = scope($a, 'persist');
-		$b = scope($b);
+		$b = scope($b, 'persist');
 		print "$opc $a $b $t\n";
 	    }
 	    unshift @$list, "\@$t"; ringbuft();
