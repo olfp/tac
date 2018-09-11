@@ -1,0 +1,13 @@
+// test shla data stmt
+
+var i, j <- 2;
+
+data 42, 69, 96, 123, -1;
+
+loop {
+     read i;
+     stop on(i < 0);
+     i <- i * j;
+}
+
+# EOF

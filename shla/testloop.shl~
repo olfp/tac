@@ -1,0 +1,23 @@
+// test sub calls
+
+// declare some
+var a <- 0; 
+var b <- -10; // minus is baaad
+
+sub inc {
+    a <- a + 1;
+}
+
+main { 
+	// this is if
+	if(a < -b) { 
+		call inc;
+	} else { 
+		a <- 12; 
+	}
+	while(a >= 0) {
+		a <- a - 1;
+	}
+}
+
+// EOF

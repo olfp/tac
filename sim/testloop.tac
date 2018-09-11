@@ -1,1 +1,1 @@
-../shl/testloop.tac
+../shla/testloop.tac

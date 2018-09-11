@@ -1,0 +1,16 @@
+// fac in shla
+
+var f <- 0;
+
+sub fac(n, ref r) {
+  if(n = 1) {
+    r <- 1;
+  } else {
+    r <- r * n;
+    fac(n - 1, r);
+  }
+}
+
+main {
+  fac(6, f);
+}

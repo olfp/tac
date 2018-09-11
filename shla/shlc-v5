@@ -11,32 +11,28 @@ use Getopt::Long;
 my $grammar = <<'...';
 # Precedence Climbing grammar:
 program: declarations main begin statements end
-
 # General Tokens
+escape: / [0nt] /
 line: / ANY* EOL /
+blanks: / BLANK+ /
+blank-line: / BLANK* EOL /
 comment: / '//' line /
 ws: /(: BLANK | EOL | comment )/
 
-# declarations
 declarations: vardecls*
-vardecls: pragma | vardecl | datastmt | subdecl
-pragma: /- HASH 'pragma' - name - ( NS+ ) -/
+vardecls: vardecl | datastmt | subdecl
 vardecl: /- 'var' -/ declinit+ %% COMMA /- SEMI -/
 declinit: assign | declare
 declare: variable dimension?
 dimension: /- LSQUARE -/ cardinal /- RSQUARE -/
-subdecl: /- 'sub' -/ subsign block
-subsign: name /- LPAREN -/ formparam* %% COMMA /- RPAREN -/
-formparam: (refparam | valparam)
-refparam: (/- 'ref' -/) variable
-valparam: (/- 'val' -/)? variable
+subdecl: /- 'sub' -/ subname block
+subname: variable
 main: /- 'main'/
 
 # statements
 statements:  statement*
 statement: assignstmt | readstmt | datareset | control | subcall
-subcall: /- 'call' -/ variable params /- SEMI/
-params: /- LPAREN -/ expr* %% COMMA /- RPAREN -/
+subcall: /- 'call' -/ variable /- SEMI/
 control: if | loop | stopon
 assignstmt: assign /- SEMI -/
 assign: variable /- '<-' -/ expr
@@ -61,19 +57,16 @@ datareset: /- 'reset' - SEMI -/
 docondition: condition
 gocondition: condition 
 condition: expr /- ([ '<=>' ]+) -/ expr
-block: begin localdecl? statements end
+block: begin statements end
 begin: /- LCURLY -/
-local: /- 'local' / 
-localdecl: local - declinit+ %% COMMA /- SEMI -/
 end: /- RCURLY -/
 
 # expressions
-expr: /- ( ['-!']? ) / addsub
-addsub: muldiv+ % /- ( [ '+-|^' ])/
-muldiv: token+ % /- ([ '*/&' ] | '<<' | '>>' )/
+expr: /- ( '-'? ) / addsub
+addsub: muldiv+ % /- ( [ '+-' ])/
+muldiv: token+ % /- ([ '*/' ])/
 token: /- LPAREN -/ expr /- RPAREN/ | number | variable
 variable: /- ( ALPHA WORD* ) / index?
-name: /- ( ALPHA WORD* ) /
 index: /- LSQUARE -/ expr /- RSQUARE -/
 number: /- ( '-'? DIGIT+ )/
 cardinal: /- ( DIGIT+ )/
@@ -89,90 +82,27 @@ cardinal: /- ( DIGIT+ )/
     my %opcode = (
 	'+' => 'ADD',
 	'-' => 'SUB',
-	'|' => 'IOR',
-	'^' => 'XOR',
 	'*' => 'MUL',
 	'/' => 'DIV',
-	'&' => 'AND',
-	'<<' => 'SHL',
-	'>>' => 'SHR',
 	'<-' => 'MOV',
 	);
 
-    my $toff = 16; # start of tmp ringbuf
-    my $t = $toff; # pointer in tmp ringbuf
-    my $tlen = 16; # length of tmp ringbuf
+    my $t = 10; # start of tmp cells
     my $labelno = 0;
     my @ilabels = ();
     my @llabels = ();
     my @slabels = ();
-    my %locsym = ();
     my $haslbl = 0;
     my $isdecl = 0;
-    my $islocal = 0;
-    my $frmpos = 0;
-    my $cursub = undef;
-
-    sub ringbuft {
-	$t = (($t + 1) % $tlen) + $toff;
-    }
-
-    sub emit {
-	my $code = shift;
-	print "\t" if !$haslbl;
-	print "$code\n";
-	$haslbl = 0;
-    }
-
-    sub mklbl {
-	my $lbl = shift;
-	emit("NOP") if $haslbl;
-	$lbl = sprintf("L%05d", $lbl) if($lbl =~ /^\d+/);
-	print "$lbl:\t";
-	$haslbl = 1;
-    }
     
-    sub scope {
-	my $var = shift;
-	my $para = shift;
-	my $isarray = ($para =~ /array/);
-	# print "LOCSYM $cursub:$var: " . Dumper(%locsym);
-	if($var =~ /^\d+/) {
-	    return "#$var";
-	}
-	my $locnam = "$cursub:$var";
-	if(exists $locsym{$locnam}) {
-	    my ($frmpos, $cby) = @{$locsym{$locnam}};
-	    emit("SUB FRMPTR #$frmpos $t");
-	    emit("MOV *$t $t") if($cby eq 'ref');
-	    if($isarray) {
-		$var = "\@$t"
-	    } else {
-		$var = "*$t"
-	    }
-	}
-	if($para =~ /persist/) {
-	    ringbuft();
-	}
-	return $var;
-    }
-
-    sub setbits {
-	my $bits = shift;
-	$main::bits = $bits;
+    sub initial {
 	$maxnum =  (1 << $main::bits) - 1;
 	# print "MAXNUM: $maxnum bits $main::bits\n";
-    }
-
-    sub initial {
-	setbits($main::bits);
 	print "; shlc SHLA compilation " . localtime() . "\n";
 	print "; this assumes a TAC with $main::bits bit word width\n";
-	print "; mem locs 1-255 are local local or temporary vars\n";
-	mklbl("RESET");  emit("JMP MAIN");
-	mklbl("STKPTR"); emit("MEM 255");
-	mklbl("FRMPTR"); emit("MEM 255");
-	print ".=\t256\n";
+	print "; mem locs 10-99 are temp vars for expr eval\n";
+	print "RESET:\tJMP MAIN\n";
+	print ".=\t100\n";
 	$isdecl = 1;
 
         my ($self, $list) = @_;
@@ -181,9 +111,18 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
-    sub got_main {
+    sub got_vardecls {
 	$isdecl = 0;
-	mklbl("MAIN");
+    
+        my ($self, $list) = @_;
+        return $list unless ref $list;
+
+        return @$list;
+    }
+
+    sub got_main {
+	print "MAIN:\t";
+	$haslbl = 1;
     
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -193,21 +132,14 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_declare {
         my ($self, $list) = @_;
-	# print "VARDECL: " . Dumper($list);
         return $list unless ref $list;
 	my ($var, $dim) = splice(@$list, 0, 2);
 
-	# print "DECL: $var - $dim\n";
+	#print "DECL: $var - $dim\n";
 	my $val = 0;
 	$val = "0*$dim" if $dim;
 	if($isdecl) {
 	    print "$var=\tMEM $val\n";
-	} else {
-	    if($islocal) {
-		my $locnam = "$cursub:$var";
-		# print "LOCALDECL $locnam\n";
-		$locsym{$locnam} = [$frmpos++, 'val'];
-	    }
 	}
         return; # @$list;
     }
@@ -215,21 +147,17 @@ cardinal: /- ( DIGIT+ )/
     sub got_assign {
         my ($self, $list) = @_;
         return $list unless ref $list;
-	# print "ASSIGN: " . join('/', @$list) . "\n";
 
 	while (@$list > 1) {
 	    my ($var, $val) = splice(@$list, 0, 2);
 	    if($isdecl) {
 		print "$var=\tMEM $val\n";
 	    } else {
-		if($islocal) {
-		    my $locnam = "$cursub:$var";
-		    # print "LOCALVAR $locnam\n";
-		    $locsym{$locnam} = [$frmpos++, 'val'];
-		}
-		$var = scope($var, 'lvalue');
-		$val = scope($val);
-		emit("MOV $val $var");
+		$val = "#$val" if($val =~ /^\d/);
+		$val =~ s/^@(\d+)/$1/;
+		print "\t" if !$haslbl;
+		print "MOV $val $var\n";
+		$haslbl = 0;
 	    }
 	}
         return @$list;
@@ -242,7 +170,7 @@ cardinal: /- ( DIGIT+ )/
 	# print "DO-COND" . join('/', @$list) . "\n";
 	my ($a, $rel, $b) = splice(@$list, 0, 3);
 
-	makecond($a, $rel, $b, 'do');
+	$haslbl = makecond($a, $rel, $b, $haslbl, 'do');
 
         return @$list;
     }
@@ -254,7 +182,7 @@ cardinal: /- ( DIGIT+ )/
 	# print "GO-COND" . join('/', @$list) . "\n";
 	my ($a, $rel, $b) = splice(@$list, 0, 3);
 
-	makecond($a, $rel, $b, 'go');
+	$haslbl = makecond($a, $rel, $b, $haslbl, 'go');
 
         return @$list;
     }
@@ -269,7 +197,7 @@ cardinal: /- ( DIGIT+ )/
 
 
     sub makecond {
-	my ($a, $rel, $b, $mode) = @_;
+	my ($a, $rel, $b, $haslbl, $mode) = @_;
 
 	push @ilabels, ++$labelno;
 	my $endlop = sprintf "L%05d", $labelno;
@@ -282,27 +210,38 @@ cardinal: /- ( DIGIT+ )/
 	    push @jumps, ($doorgo ? 'JEQ' : 'JNE');
 	} elsif($rel eq '>') {
 	    push @jumps, ($doorgo ? ('JEQ', 'JLE') : 'JGT');
-	} elsif($rel eq '=>' or $rel eq '>=') {
+	} elsif($rel eq '=>') {
 	    push @jumps, ($doorgo ? 'JLE' : ('JEQ', 'JGT'));
 	} elsif($rel eq '<') {
 	    push @jumps, ($doorgo ? ('JEQ', 'JGT') : 'JLE');
-	} elsif($rel eq '<=' or $rel eq '=<') {
+	} elsif($rel eq '<=') {
 	    push @jumps, ($doorgo ? 'JGT' : ('JEQ', 'JLE'));
 	} else {
 	    die "FATAL: Undefined relational operator '$rel'.\n";
 	}
-	$a = scope($a);
-	$b = scope($b);
-	emit("CMP $a $b");
+	print "\t" if !$haslbl;
+	$a = "#$a" if($a =~ /^\d/);
+	$a =~ s/^@(\d+)/$1/;
+	$b = "#$b" if($b =~ /^\d/);
+	$b =~ s/^@(\d+)/$1/;
+	print "CMP $a $b\n";
 	foreach my $jump (@jumps) {
-	    emit("$jump $endlop");
+	    print "\t$jump $endlop\n";
 	}
+	$haslbl = 0;
+
+	return $haslbl;
     }
 
     sub got_loopcmd {
+	if($haslbl) {
+	    print "NOP\n";
+	    $haslbl = 0;
+	}
 	my $startlbl = ++$labelno;
 	push @llabels, $startlbl;
-	mklbl($startlbl);
+	printf "L%05d:\t", $startlbl;
+	$haslbl = 1;
 	
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -311,10 +250,12 @@ cardinal: /- ( DIGIT+ )/
     }
 
     sub got_elsecmd {
+	#my $lno0 = pop @ilabels; # unused if label
 	my $elselbl = pop @ilabels; # target of not-cond
 	push @ilabels, ++$labelno;
-	emit(sprintf "JMP L%05d", $labelno);
-	mklbl($elselbl);
+	printf "\tJMP L%05d\n", $labelno;
+	printf "L%05d:\t", $elselbl;
+	$haslbl = 1;
 	
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -332,134 +273,41 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
-    sub got_valparam {
+    sub got_subname {
         my ($self, $list) = @_;
+	my $name = $list;
+	printf "%-6s\tMEM 0\n", "$name:";
+	push @slabels, $name;
+
 	return $list unless ref $list;
-	# print "VALPP: " . join('/', @$list) . "\n";
-	my ($name) = splice(@$list, 0, 1);
-
-	unshift @$list, "val:$name";
-
-        return @$list;
-    }
-
-    sub got_refparam {
-        my ($self, $list) = @_;
-	return $list unless ref $list;
-	# print "REFP: " . join('/', @$list) . "\n";
-	my ($name) = splice(@$list, 0, 1);
-
-	unshift @$list, "ref:$name";
-	
-        return @$list;
-    }
-
-    sub got_subsign {
-	$isdecl = 0;
-        my ($self, $list) = @_;
-	return $list unless ref $list;
-	# print "SUBSIGN: " . join('/', @$list) . "\n";
-
-	$frmpos = 0;
-	while (@$list > 1) {
-	    my ($name, $params) = splice(@$list, 0, 2);
-	    # print "SUBPARA $name: " . Dumper(@$params);
-	    my @callmode = (); 
-	    foreach my $obj (@$params) {
-		if(defined $obj) {
-		    my ($cby, $var) = split /:/, $obj;
-		    push @callmode, $cby;
-		    my $locnam = "$name:$var";
-		    # print "LOCAL $cby $locnam\n";
-		    $locsym{$locnam} = [$frmpos++, $cby];
-		}
-	    }
-	    $locsym{$name} = \@callmode;
-
-	    printf "%-6s\tMEM 0\n", "$name:";
-	    # put return addr in reserved slot at FRMPTR +1
-	    emit("ADD FRMPTR #1 $t");
-	    emit("MOV $name *$t");
-	    
-	    push @slabels, $name;
-	    #$frmpos = "#$frmpos" unless($frmpos =~/^\@/);
-	    unshift @$list, "$frmpos";
-	    $cursub = $name;
-	}
-
 	return @$list;
     }
 
     sub got_subdecl {
-	$isdecl = 1;
         my ($self, $list) = @_;
         return $list unless ref $list;
-	# restore stack ptr (to prev frame)
-	emit("MOV FRMPTR STKPTR");
-	# pop return addr
-        emit("ADD STKPTR #1 STKPTR");
-	emit("MOV *STKPTR $t");
-	# pop prev. frame ptr
-	emit("ADD STKPTR #1 STKPTR");
-	emit("MOV *STKPTR FRMPTR");
-	    
+	#print Dumper(@$list);
+
 	my $sub = pop @slabels;
-	#printf "\tJMP *%s\n", $sub;
-	emit("JMP *$t");
-	$cursub = undef;
-	
+	printf "\tJMP *%s\n", $sub;
 	return @$list;
     }
 
     sub got_subcall {
         my ($self, $list) = @_;
         return $list unless ref $list;
-	# print "CALL: " . join('/', @$list) . "\n";
+	#print "CALL: " . join('/', @$list) . "\n";
 
  	while (@$list > 0) {
-	    my ($name, $params) = splice(@$list, 0, 2);
-	    # print "CALL PARAMS: " . Dumper($params);
-	    my $myfrm = $t; ringbuft();
-	    emit("MOV FRMPTR $myfrm");
-	    # push frame ptr, leave one word for ret addr
-	    emit("MOV FRMPTR *STKPTR");
-	    emit("SUB STKPTR #2 STKPTR");
-	    # start new frame
-	    emit("MOV STKPTR FRMPTR");
-	    my @callmode = @{$locsym{$name}}; 
-	    foreach my $obj (@$params) {
-		if(defined $obj) {
-		    my $cm = shift @callmode;
-		    my $locnam = "$cursub:$obj";
-		    # print "CHECKLOC: $locnam $cm\n";
-		    if(exists $locsym{$locnam}) {
-			my ($frmpos, $cby) = @{$locsym{$locnam}};
-			emit("SUB $myfrm #$frmpos $t");
-			emit("MOV *$t $t") unless($cby eq 'val');
-			$obj = "$t";
-		    } else {
-			$obj = "#$obj" unless(($obj =~ /^\@/) or ($cm eq 'val'));
-			$obj = "#$obj" if($obj =~ /^\d+/);
-		    }
-		    emit("MOV $obj *STKPTR");
-		    emit("SUB STKPTR #1 STKPTR");
-		}
-	    }
-	    emit("JSR $name");
+	    my ($var) = splice(@$list, 0, 1);
+	    print "\t" if !$haslbl;
+	    printf "JSR %s\n", $var;
+	    $haslbl = 1;
 	}
         return @$list;
     }
 
-    sub got_local {
-	$islocal = 1;
-        my ($self, $list) = @_;
-        return $list unless ref $list;
-
-        return @$list;
-    }
-
-    sub got_localdecl {
-	$islocal = 0;
+    sub got_block {
         my ($self, $list) = @_;
         return $list unless ref $list;
 
@@ -470,8 +318,12 @@ cardinal: /- ( DIGIT+ )/
 	my $brklbl = pop @llabels;
 	my $loplbl = pop @llabels;
 
-	emit(sprintf "JMP L%05d", $loplbl);
-	mklbl($brklbl);
+	print "\t" if !$haslbl;
+	printf "JMP L%05d\n", $loplbl;
+	$haslbl = 0;
+	
+	printf "L%05d:\t", $brklbl;
+	$haslbl = 1;
 	
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -483,7 +335,8 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_if {
 	my $filbl = pop @ilabels;
-	mklbl($filbl);
+	printf "L%05d:\t", $filbl;
+	$haslbl = 1;
 	
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -500,19 +353,14 @@ cardinal: /- ( DIGIT+ )/
 
 	while (@$list > 1) {
 	    my ($a, $op, $b) = splice(@$list, 0, 3);
-	    my $opc = $opcode{$op};
-	    if($opc =~ /^SH[LR]$/) {
-		$a = scope($a);
-		emit("$opc $a $t");
-		for(my $n = $b - 1; $n > 0; $n--) {
-		    emit("$opc $t $t");
-		}
-	    } else {
-		$a = scope($a, 'persist');
-		$b = scope($b, 'persist');
-		emit("$opc $a $b $t");
-	    }
-	    unshift @$list, "\@$t"; ringbuft();
+	    $a = "#$a" if($a =~ /^\d/);
+	    $a =~ s/^@(\d+)/$1/;
+	    $b = "#$b" if($b =~ /^\d/);
+	    $b =~ s/^@(\d+)/$1/;
+	    print "\t" if !$haslbl;
+	    print $opcode{$op} . " $a $b $t\n";
+	    $haslbl = 0;
+	    unshift @$list, "\@$t"; $t++;
 	}
         return @$list;
     }
@@ -529,18 +377,11 @@ cardinal: /- ( DIGIT+ )/
 		    my $cv = -$v & $maxnum;
 		    unshift @$list, $cv;
 		} else {
-		    $v = scope($v);
-		    emit("COM $v $t");
-		    unshift @$list, "\@$t"; ringbuft();
-		}
-	    } elsif($s eq '!') {
-		if($isdecl) {
-		    my $iv = !$v & $maxnum;
-		    unshift @$list, $iv;
-		} else {
-		    $v = scope($v);
-		    emit("NOT $v $t");
-		    unshift @$list, "\@$t"; ringbuft();
+		    print "\t" if !$haslbl;
+		    $v = "#$v" if($v =~ /^\d/);
+		    print "COM $v $t\n";
+		    $haslbl = 0;
+		    unshift @$list, "\@$t"; $t++;
 		}
 	    } else {
 		unshift @$list, $v;
@@ -552,7 +393,7 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_variable {
         my ($self, $list) = @_;
-	#print "VAR: " . Dumper($list);
+	# print "VAR: " . Dumper($list);
         return $list unless ref $list;
 
 	if(!$isdecl) {
@@ -560,14 +401,17 @@ cardinal: /- ( DIGIT+ )/
 
 	    while (@$list > 1) {
 		my ($var, $idx) = splice(@$list, 0, 2);
-		#print "PreScope: $var $idx\n";
-		$var = scope($var, 'array');
-		#print "PostScope: $var $idx\n";
-		$idx = scope($idx);
-		# use addr not content if not pointer
-		$var = "#$var" unless($var =~ /^[\*\@]/);
-		emit("ADD $var $idx $t");
-		unshift @$list, "*$t"; ringbuft();
+		if($idx =~ /^(@)?(\d+)/) {
+		    $idx = ($1 eq '\@') ? $1 : "#$2";
+		}
+		if($idx eq '#0') {
+		    unshift @$list, "$var";
+		} else {
+		    print "\t" if !$haslbl;
+		    print "ADD #$var $idx $t\n";
+		    $haslbl = 0;
+		    unshift @$list, "*$t"; $t++;
+		}
 	    }
 	}
         return @$list;
@@ -608,9 +452,10 @@ cardinal: /- ( DIGIT+ )/
 	while(scalar(@$read)) {
 	    my $rdvar = shift @$read;
 	    if(defined $rdvar) {
-		$rdvar = scope($rdvar);
-		emit("MOV *DATPTR $rdvar");
-		emit("ADD DATPTR #1 DATPTR");
+		print "\t" if !$haslbl;
+		$haslbl = 0;
+		print "MOV *DATPTR $rdvar\n";
+		print "\tADD DATPTR #1 DATPTR\n";
 	    }
 	}
 
@@ -622,7 +467,9 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_datareset {
         my ($self, $list) = @_;
-	emit("MOV #DATA DATPTR");
+	print "\t" if !$haslbl;
+	$haslbl = 0;
+	print "MOV #DATA DATPTR\n";
 
         return $list unless ref $list;
 	#print "rule: " . join('/', @$list) . "\n";
@@ -630,22 +477,6 @@ cardinal: /- ( DIGIT+ )/
         return @$list;
     }
 
-    sub got_pragma {
-        my ($self, $list) = @_;
-        return $list unless ref $list;
-	my ($name, $body) = splice(@$list, 0, 2);
-	print "#PRAGMA\t$name $body\n";
-	if($name eq 'bits') {
-	    if($body =~ /^\d+$/) {
-		setbits($body);
-	    } else {
-		die "Fatal: Not a wordsize in bits: $body.\n";
-	    }
-	}
-
-        return @$list;
-    }
-    
     sub gotrule {
         my ($self, $list) = @_;
         return $list unless ref $list;
@@ -655,9 +486,9 @@ cardinal: /- ( DIGIT+ )/
     }
 
     sub final {
-	emit("HLT");
-	mklbl("HEAP");
-	emit("MEM 0");
+	print "\t" if !$haslbl;
+	$haslbl = 0;
+	print "HLT\n";
         my ($self, $list) = @_;
         return $list unless ref $list;
 

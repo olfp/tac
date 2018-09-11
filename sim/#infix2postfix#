@@ -1,0 +1,87 @@
+#!/usr/bin/perl
+use strict;
+
+if(!$ARGV[0]){
+  die("Usage: ./infix2prefix INPUT_FILE\n");
+}
+
+my $scalar_re = qr/[a-z0-9]+/;
+
+# process file
+my $infile = $ARGV[0];
+open(FILE,"< $infile");
+while(<FILE>){
+	chomp;
+	print eval_expr($_) . "\n";
+}
+close(FILE);
+
+sub eval_expr{
+	my ($expr) = @_;
+	chomp($expr);
+
+	# base case, return the simple scalar	
+	if($expr =~ /^[\( ]*($scalar_re)[\) ]*$/){
+		return $1;	
+	}
+	# base case, reformat a simple expression
+	elsif($expr =~ /^\s*\(?\s*($scalar_re+) ([\*\+\-\+]) ($scalar_re+)\s*\)?\s*$/){
+		return "( $2 $1 $3 )";	
+	}
+
+	# complex expressions
+	# methodology: recursively breakdown the complex expression into the base cases
+	# 	
+	# steps:
+	#	1) find position of lowest-precedent operator at highest depth
+	#	   ( preserves order of operations )
+	#	2) bifurcate expression into operator, l-operand, r-operand
+	# 	3) format into prefix order, recurse on operands
+	# example:
+	#		2 * ( 1 + 5 )
+	#		 / \ 
+	# 	        2  ( 1 + 5 )
+	# 	              / \		
+	# 		     1   5
+	my $i = 0;
+	my $ch;
+	my %ops;
+	my $depth = 0;
+	while($i < length($expr)){
+		$ch = substr($expr,$i,1);	
+
+		if($ch eq '('){
+			$depth++;	
+		}
+		elsif($ch eq ')'){
+			$depth--;	
+		}
+		elsif($ch =~ /[\+\-]/){	
+			push @{$ops{depth}{$depth}{prec}{1}}, { op => $ch, pos => $i };
+		}
+		elsif($ch =~ /[\*\/]/){
+			push @{$ops{depth}{$depth}{prec}{0}}, { op => $ch, pos => $i };
+		}
+		$i++;	
+	}
+≈ç	
+	# find lowest priority operator at highest depth
+	my $l_operand;
+	my $r_operand;
+	foreach my $depth(sort keys %{$ops{depth}}){
+		# find a lower precedent operator to bifurcate expression
+		foreach(@{$ops{depth}{$depth}{prec}{1}}){
+			$l_operand = substr($expr, 0, $_->{pos}-1);
+			$r_operand = substr($expr, $_->{pos}+1);
+			return sprintf("( %s %s %s )",$_->{op}, eval_expr($l_operand), eval_expr($r_operand));		
+		}
+		# no lower precedent operator found, use a higher precedent operator
+		foreach(@{$ops{depth}{$depth}{prec}{0}}){
+			$l_operand = substr($expr, 0, $_->{pos}-1);
+			$r_operand = substr($expr, $_->{pos}+1);
+			return sprintf("( %s %s %s )",$_->{op}, eval_expr($l_operand), eval_expr($r_operand));		
+		}
+	}
+
+	return $expr;
+}

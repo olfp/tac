@@ -1,0 +1,19 @@
+// fac in shla
+
+#pragma bits 12
+#pragma print f
+
+var f <- 0;
+
+sub fac(n, ref r) {
+  if(n = 1) {
+    r <- 1;
+  } else {
+    r <- r * n;
+    call fac(n - 1, r);
+  }
+}
+
+main {
+  call fac(3, f);
+}

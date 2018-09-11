@@ -1,0 +1,22 @@
+//
+// nested sub calls with params
+//
+//pragma dump a
+//
+
+var a <- 2;
+var b <- 3;
+
+sub plusone(ref x, val z) {
+  x <- x + z;
+}
+
+sub plustwo(ref x, y) {
+  x <- x + y;
+  y <- a * 2;
+  call plusone(x, 42);
+}
+
+main {
+  call plustwo(a, b);
+}

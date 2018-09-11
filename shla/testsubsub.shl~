@@ -1,0 +1,20 @@
+//
+// nested sub calls with params
+//
+//pragma dump a
+//
+
+var a <- 42;
+
+sub makeone(x) {
+  x <- 1;
+}
+
+sub maketwo(x) {
+  x <- 2;
+  call makeone(x);
+}
+
+main {
+  call maketwo(a);
+}

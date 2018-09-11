@@ -1,0 +1,34 @@
+// shla base function test from shlc/tacsim
+// set bitsize large enough (20) or observe overflow in test 3
+
+#pragma print ctab[10],stab[10],mtab[10]
+
+var cnt, sum <- 0, pro <- 1, ctab[10], stab[10], mtab[10];
+
+main {
+	// #1 count to 10
+	cnt <- 0;
+	loop {
+		cnt <- cnt + 1;
+		ctab[cnt-1] <- cnt;
+		stop on (cnt > 9);
+	}
+	// #2 count to 10 and sum up
+	cnt <- 0;
+	loop {
+		cnt <- cnt + 1;
+		sum <- sum + cnt;
+		stab[cnt-1] <- sum;
+		stop on (cnt > 9);
+	}
+	// #3 count to 10 nd multiply
+        cnt <- 0;
+        loop {
+                cnt <- cnt + 1;
+                pro <- pro * cnt;
+                mtab[cnt-1] <- pro;
+                stop on (cnt > 9);
+        }
+}
+
+// EOF
