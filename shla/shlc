@@ -220,7 +220,7 @@ cardinal: /- ( DIGIT+ )/
 	while (@$list > 1) {
 	    my ($var, $val) = splice(@$list, 0, 2);
 	    if($isdecl) {
-		print "$var=\tMEM $val\n";
+		print "$var:\tMEM $val\n";
 	    } else {
 		if($islocal) {
 		    my $locnam = "$cursub:$var";
@@ -582,7 +582,7 @@ cardinal: /- ( DIGIT+ )/
 	    my $datelem = shift @$data;
 	    if(defined $datelem) {
 		if($first) {
-		    print "DATA=\t";
+		    print "DATA:\t";
 		    $first = 0;
 		} else {
 		    print "\t";
@@ -593,7 +593,7 @@ cardinal: /- ( DIGIT+ )/
 		print "MEM $datelem\n" 
 	    }
 	}
-	print "DATPTR=\tMEM DATA\n";
+	print "DATPTR:\tMEM DATA\n";
 	
         return $list unless ref $list;
 	#print "data: " . join('/', @$list) . "\n";
