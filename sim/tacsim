@@ -3,32 +3,35 @@
 =for tac cpu
   tac - the three address code machine simulatur/interpreter
 
-  implements a virtual cpu with the following commands, involving up 
-  to three memory locations.
+  Implements a virtual cpu with the following commands, involving up 
+  to three memory locations. Internal state is the program stata word
+  (PSW) consisting of the current program locaion (address) and three 
+  flags: Zero, Negative and Carry
 
-  Since the source lines are interpretedt directly without transfer
-  to binary format, program store (lines) and data store (words) are 
-  seperate (Harvard architecture); but there is only one location
-  counter so normal data and program addresses will not overlap.
+  The source lines are interpreted directly without transfer to binary 
+  format, so a memory cell stores either data or a source line number.
 
-  A label with a colon (:) as sigil will generate a program store ref
-  when used, a label with a equal-sign (=) as sigl a data ref.
+  Source lines consist of an optional label terminated with a colon (:)
+  and the tac command with up to three arguments. Everything from a
+  semicolon(;) on is a comment.
  
-  The cpu consequently has not registers and the program counter is not
-  user visible. Operations set conditions flags (zero, negative, carry)
- 
-  Syntax:
-  - normal arg is direct (dir) address, mem[arg]
-  - leading asterisk (*) denotes indirection (ind), mem[mem[arg]]
-  - leading hash (#) denotes immediate value (imm), arg
+  Argument syntax:
+  - normal arg is direct (dir) address; leading at-sign(@) is optional: mem[arg]
+  - leading asterisk (*) denotes indirection (ind): mem[mem[arg]]
+  - leading hash (#) denotes immediate value (imm): arg
+
+  For jump instructions there is one level of indirection less:
+  - normal arg is direct (dir) address: arg
+  - leading asterisk (+) denotes indirection (ind): mem[arg]
  
   Address-Abbreviations:
     <imm-or-addr> : either #<imm> or <addr> or *<addr>
     <dir-or-ind>  : either <addr> or *<addr>
 
+  Operations:
   Move first argument to second
     mov <imm-or-addr> <dir-or-ind> 
-  Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
+  Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor) may set carry flag
     add <imm-or-addr> <imm-or-addr> <dir-or-addr>
   Monadic arithmetic/logic (com[plement], not)
     com <imm-or-addr> <dir-or-addr>
@@ -37,23 +40,33 @@
   Implemented: logical shift/rotate left/right with carry
   Commands: shl/shr/rol/ror
     shl <imm-or-addr> <dir-or-addr>
-  Compare (like sub but only sets flag)
+  Compare (like sub but only sets flag zero, negative and/or carry)
     cmp <imm-or-addr> <imm-or-addr>
-  Branching (jmp, jeq (equal, i.e. cmp yields zero), jne (not equal), 
-    jle (less, i.e. cmp yields negative), jgt (greater), 
-    jcs (carry set), jcc (carry clear) 
-    jmp <addr>, jsr  <addr> (move retvec <addr>, jmp <addr+1>)
+  Branching (jump if compare fullfills condition: beq (equal, zero flag set), 
+  bne (not equal), ble (less, negative flag set), bgt (greater))
+    beq <imm-or-addr> <imm-or-addr> <dir-or-ind>
+  Jumping (jmp, jeq (equal, zero flag set), jne (not equal), 
+  jle (less, i.e. negative flag set), jgt (greater), 
+  jcs (carry flag set), jcc (carry clear) 
+    jmp <dir-or-ind>, jsr <dir-or-ind> (move retvec <addr>, jmp <addr+1>)
   Miscelaeneous: Clear carry flag, no-operation, halt
     clc
     nop
     hlt
+
+  Pseudoops:
+    mem <val>[*<cnt>] set one or more memory cells at the current location to
+      the given value.
+    .= <val> sets the location to the given value
  
   On program start a data file may be read into a specified address range
-  and after program termination data contents may be printed. This can
-  either be configured via the -r (read), -p (print) and -d (dump) command
-  line switches to the tacsim command or embeded in the source code via
+  and after program termination data contents may be printed. Also the word
+  width of the machine can be set on startup. This can either be configured 
+  via the -b (bits), -r (read), -p (print) and -d (dump) command line switches 
+  to the tacsim command or embeded in the source code via
   #pragma pseudo-ops.
   
+    #pragma bits <num>
     #pragma read <file@addr>
     #pragma dump <addr>,<addr>
     #pragma dump <addr>,+<cnt>
@@ -61,6 +74,8 @@
     #pragma print <list of variables, array, addresses>
   
   Note that the argument to the pragma may not contain spaces!
+
+  Installation: You will need Perl with modules File::Slup and optionan Term::ReadLine::Gnu
 
 =cut
 
@@ -75,7 +90,7 @@ use Text::Tabs;
 # cmdline options
 my $bits = 10; # default: 10 bits, 1024 memory cells, max unsigned is 1023
 my $fmt = 'd'; # number output defaults to decimal
-my ($srcfile, $datafile, $helpme, $dumps, $punch, $trace, $quiet, $inter);
+my ($srcfile, $datafile, $helpme, $dumps, $punch, $trace, $quiet, $setvar, $goto, $inter);
 
 GetOptions(
     "help|?" => \$helpme,
@@ -86,20 +101,25 @@ GetOptions(
     "quiet" => \$quiet,
     "bits=i" => \$bits,
     "format=s" => \$fmt,
+    "set=s" => \$setvar,
+    "goto=s" => \$goto,
     "interactive" => \$inter,
     ) or die("Fatal error: Cannot understand options\n");
 
 my ($srcfile, $endguard) = @ARGV;
 die qq/Usage: tacsim [ options ] srcfile
-    -h             - this help
-    -r <file\@addr> - read whitespace delimited numbers from file to addr
-    -d <n>         - dump ten memloc starting at <n> after run
-    -p <addr, ...> - print mem loc list (addrs, symbols and arrays) after run
-    -t             - trace mode on
-    -q             - quiet mode
-    -b <n>         - set word width to <n> bits (default 10)
-    -f [dxo]       - set number output format to dec, oct, hex
-    -i             - enter interacive monitor after startup
+    -h               - this help
+    -r <file\@addr>  - read whitespace delimited numbers from file to addr
+    -d <n>           - dump ten memloc starting at <n> after run
+    -p <addr, ...>   - print mem loc list (addrs, symbols and arrays) after run
+    -s <addr=v, ...> - set mem loc list (addrs, symbols and arrays) before run
+    -t               - trace mode on
+    -g <addr>        - start exeution at address given
+    -e               - exit simulator on halt
+    -q               - quiet mode
+    -b <n>           - set word width to <n> bits (default 10)
+    -f [dxo]         - set number output format to dec, oct, hex
+    -i               - enter interacive monitor after startup
 /
     if(!defined $srcfile || defined $endguard || defined $helpme);
 
@@ -180,13 +200,13 @@ sub taceval {
 sub tacargs {
     my @fixed = ();
     my $trace = "";
-    my $dirind = shift;
-    my $argcnt = scalar @{$dirind};
+    my $dirind = shift; # Array of R)ead, W)rite, J)ump
+    my $argcnt = scalar @{$dirind}; 
     if($argcnt != scalar(@_)) {
 	print "Error: Expected $argcnt operands in line $lineno.\n";
     } else {
 	foreach my $arg (@_) {
-	    my $dir = shift $dirind;
+	    my $dir = shift @{$dirind};
 	    my ($val, $mode) = @{ $arg };
 	    # print "TACARG: $val, $mode, $dir\n";
 	    $trace .= " $mode$val";
@@ -400,7 +420,7 @@ sub tac_clc {
 }
 
 sub tac_jmp {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0]);
     prtrace("JMP", $argtrace) if $trace;
@@ -408,7 +428,7 @@ sub tac_jmp {
 }    
 
 sub tac_jsr {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     $mem[$args[0]] = $memptr + 1;
     my $res = tacscale($args[0]+1);
@@ -417,51 +437,91 @@ sub tac_jsr {
 }    
 
 sub tac_jeq {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JEQ", $argtrace, 0, 'cond') if $trace;
+    prtrace("JEQ", $argtrace, undef, 'cond') if $trace;
     return $cond{'Z'} ? $res : 0;
 }    
 
 sub tac_jne {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JNE", $argtrace, 0, 'cond') if $trace;
+    prtrace("JNE", $argtrace, undef, 'cond') if $trace;
     return $cond{'Z'} ? 0 : $res;
 }    
 
 sub tac_jle {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JLE", $argtrace) if $trace;
+    prtrace("JLE", $argtrace, undef, 'cond') if $trace;
     return $cond{'N'} ? $res : 0;
 }    
 
 sub tac_jgt {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JGT", $argtrace) if $trace;
+    prtrace("JGT", $argtrace, undef, 'cond') if $trace;
     return $cond{'N'} || $cond{'Z'} ? 0 : $res;
 }    
 
 sub tac_jcs {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JCS", $argtrace) if $trace;
+    prtrace("JCS", $argtrace, undef, 'cond') if $trace;
     return $cond{'C'} ? $res : 0;
 }    
 
 sub tac_jcc {
-    my @args = tacargs(['W'], @_);
+    my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JCC", $argtrace) if $trace;
+    prtrace("JCC", $argtrace, undef, 'cond') if $trace;
     return $cond{'C'} ? 0 : $res;
+}    
+
+sub tac_beq {
+    my @args = tacargs(['R', 'R', 'J'], @_);
+    my $argtrace = pop @args;
+    my $res = $args[0] - $args[1];
+    $cond{'C'} = ($res & $maxcells) ? 1 : 0;
+    $res = tacscale($res, 'nowarn');
+    prtrace("BEQ", $argtrace, undef, 'cond') if $trace;
+    return $cond{'Z'} ? $args[2] : 0;
+}    
+
+sub tac_bne {
+    my @args = tacargs(['R', 'R', 'J'], @_);
+    my $argtrace = pop @args;
+    my $res = $args[0] - $args[1];
+    $cond{'C'} = ($res & $maxcells) ? 1 : 0;
+    $res = tacscale($res, 'nowarn');
+    prtrace("BNE", $argtrace, undef, 'cond') if $trace;
+    return $cond{'Z'} ? 0: $args[2];
+}    
+
+sub tac_ble {
+    my @args = tacargs(['R', 'R', 'J'], @_);
+    my $argtrace = pop @args;
+    my $res = $args[0] - $args[1];
+    $cond{'C'} = ($res & $maxcells) ? 1 : 0;
+    $res = tacscale($res, 'nowarn');
+    prtrace("BLE", $argtrace, undef, 'cond') if $trace;
+    return $cond{'N'} ? $args[2] : 0;
+}    
+
+sub tac_bgt {
+    my @args = tacargs(['R', 'R', 'J'], @_);
+    my $argtrace = pop @args;
+    my $res = $args[0] - $args[1];
+    $cond{'C'} = ($res & $maxcells) ? 1 : 0;
+    $res = tacscale($res, 'nowarn');
+    prtrace("BGT", $argtrace, undef, 'cond') if $trace;
+    return $cond{'N'} || $cond{'Z'} ? 0 : $args[2];
 }    
 
 sub tac_nop {
@@ -567,7 +627,7 @@ sub docmd {
 	w \t\t- print list of watched items (printed on each break)
 	wc \t\t- cleat list of watched items
 	e <a> <v>[,<v>]\t- enter values into memory beginning at addr <a>
-	z <a>[, <b>] \t-zero memory from addr <a> to <b>
+	z <a>[, <b>] \t- zero memory from addr <a> to <b>
 	g [<a>] \t- go from addr <a> or current addr\n/;
 	$th =~ s/\n\t/\n/g;
 	print $th;
@@ -585,7 +645,7 @@ sub symres {
 	next if $addr =~ /^$/;
 	if($addr =~ /^(\+?)([0-9]+)$/ or $addr =~ /^(\+?)(?:0x)([0-9a-f]+)$/i) {
 	    my $num = $2;
-	    $num =~ s/^0+//;
+	    $num =~ s/^0+(.+)/\1/;
 	    $num = eval "$pfx$num"; 
 	    if($1 eq '+') {
 		$this = $last + $num;
@@ -619,7 +679,7 @@ sub printline {
     }
     $prompt = "NEXTOP> " if !defined $prompt;
     my $lno = $mem[$loc]-1;
-    my $line = ($lno > 0) && exists $lines[$lno]
+    my $line = ($lno >= 0) && exists $lines[$lno]
 	? $lines[$lno] : "<no line here>";
     printf("$prompt$npic: %s\n", $loc, $line) if ($loc >= 0);
 }
@@ -849,10 +909,11 @@ if(defined($srcfile)) {
 # pass one, populate symtab
 
 $lineno=1;
-foreach my $line (@lines) {
-    $line =~ s/;.*$//; # remove comments
-    #printf "$npic L:%05d: $line\n", $memptr, $lineno;
+foreach my $rline (@lines) {
+    my $line = $rline;
     my $setmem = 1;
+    $line =~ s/;.*$//; # remove comments
+    # printf "$npic L:%05d: $rline\n", $memptr, $lineno;
     if($line =~ /^#pragma\s+(\w+)\s+(.*)$/i) {
 	dopragma($1, $2);
 	$lineno++;
@@ -860,41 +921,38 @@ foreach my $line (@lines) {
     }
     if($line =~ /^((?|[[:alpha:]]|\.)[[:alnum:]]*)([:=])\s+(\S+)(\s+(\S+))?/) {
 	# print "SYM: $1 $2 /$3/ /$4/ $5\n";
-	# label or memory assignemt
-	if($2 eq ':') {
-	    # label
-	    $symtab{uc $1} = [$memptr, $1];
-	}
-	if($2 eq '=') {
-	    if($1 eq '.') {
-		# set mem ptr
-		$memptr = $3;
-		$setmem = 0;
-	    } else {
-		# mem assign
+	# location, label or memory assignemt
+	if($1 eq '.' && $2 eq '=') {
+	    # set mem ptr
+	    $memptr = $3;
+	    $setmem = 0;
+	} else {
+	    if($2 eq ':' || $2 eq '=') {
+		# label
 		my $cnt = 1;
 		$symtab{uc $1} = [$memptr, $1];
-		my $data = $5;
-		if($data !~ /^(\d+)(\*(\d+))?/) {
-		    # symbolic data
-		    # print "SYMDAT: $1 ($2) $3 - $data\n";
-		    ($data, undef) = @{$symtab{uc $data}};
-		} else {
-		    $cnt = defined $3 ? $3 : 1;
-		    $data = $1;
+		if(uc $3 eq 'MEM') {
+		    # mem assign
+		    my $data = $5;
+		    if($data !~ /^(\d+)(\*(\d+))?/) {
+			# symbolic data
+			# print "SYMDAT: $1 ($2) $3 - $data\n";
+			($data, undef) = @{$symtab{uc $data}};
+		    } else {
+			$cnt = defined $3 ? $3 : 1;
+			$data = $1;
+		    }
+		    for(my $n = 0; $n < $cnt; $n++) {
+			# print "SETMEM $cnt $memptr $data\n";
+			$mem[$memptr++] = $data;
+		    }
+		    $setmem = 0;
 		}
-		for(my $n = 0; $n < $cnt; $n++) {
-		    # print "SETMEM $cnt $memptr $data\n";
-		    $mem[$memptr++] = $data;
-		}
-		$setmem = 0;
-		    
 	    }
 	}
     }
-    if($line =~ /^(\w+:)?\s*(\S+)\s*(\S*)/ && $setmem) {
-	# print "DEPOSIT $memptr " . (($2 eq "MEM") ? $3 : $lineno) . "\n";
-	$mem[$memptr++] = ($2 eq "MEM") ? $3 : $lineno;
+    if($setmem) {
+	$mem[$memptr++] = $lineno;
     }
     $lineno++;
 }
@@ -932,9 +990,32 @@ if(defined($datafile)) {
     }
 }
 
+if(defined($setvar)) {
+    my @vars = split /,/, $setvar;
+    foreach my $var (@vars) {
+	if($var =~ /(\S+)=(\S+)/) {
+	    my $name = $1;
+	    my ($addr) = symres($name);
+	    my $data = $2;
+	    $mem[$addr] = 0+$data;
+	    print "SETVAR: $name($addr) <= $data\n" unless $quiet;
+	} else {
+	    die "Fatal: Not a memory assignement: $var.";
+	}
+    }
+}
+
 # pass two, interpret
 
 $memptr = 0;
+if(defined $goto) {
+    ($memptr) = symres($goto);
+    $goto = "$goto($memptr)";
+} else {
+    $goto = $memptr;
+}
+print "RUNNING from $goto.\n" unless $quiet;
+
 $lineno = $mem[$memptr];
 
 if($inter) {
