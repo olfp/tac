@@ -1,5 +1,7 @@
 // test shla data stmt
 
+#pragma print c,n[5]
+
 var i <- 0, a <- -10, b, c, n[5];
 
 data 42, 69, 96, 123, 2, 3, 4, 5, -1;
@@ -9,7 +11,7 @@ main {
     read a, b;
     stop on(a < 0);
     n[i] <- a * b;
-    c <- n[i-1]; // out of bouns for i=0!
+    c <- n[i-1]; // out of bounds for i=0!
     i <- i + 1;
   }
 }

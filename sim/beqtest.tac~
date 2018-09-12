@@ -1,0 +1,11 @@
+; test beqistr
+
+start: mov #12 a
+       beq a #12 label
+       add #42 a a
+       jmp end
+label: mov a b
+end:   hlt
+
+a:     mem 0
+b:     mem 0

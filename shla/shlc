@@ -8,6 +8,9 @@ use Pegex;
 use File::Slurp;
 use Getopt::Long;
 
+# cmdline options
+my ($srcfile, $outfile, $nostack, $helpme);
+
 my $grammar = <<'...';
 # Precedence Climbing grammar:
 program: declarations main begin statements end
@@ -120,6 +123,7 @@ cardinal: /- ( DIGIT+ )/
     sub emit {
 	my $code = shift;
 	print "\t" if !$haslbl;
+	$code =~ s/\@//g;
 	print "$code\n";
 	$haslbl = 0;
     }
@@ -168,10 +172,12 @@ cardinal: /- ( DIGIT+ )/
 	setbits($main::bits);
 	print "; shlc SHLA compilation " . localtime() . "\n";
 	print "; this assumes a TAC with $main::bits bit word width\n";
-	print "; mem locs 1-255 are local local or temporary vars\n";
+	print "; mem locs 1-255 are local or temporary vars\n";
 	mklbl("RESET");  emit("JMP MAIN");
-	mklbl("STKPTR"); emit("MEM 255");
-	mklbl("FRMPTR"); emit("MEM 255");
+	if(!$nostack) {
+	    mklbl("STKPTR"); emit("MEM 255");
+	    mklbl("FRMPTR"); emit("MEM 255");
+	}
 	print ".=\t256\n";
 	$isdecl = 1;
 
@@ -376,10 +382,13 @@ cardinal: /- ( DIGIT+ )/
 	    }
 	    $locsym{$name} = \@callmode;
 
-	    printf "%-6s\tMEM 0\n", "$name:";
-	    # put return addr in reserved slot at FRMPTR +1
-	    emit("ADD FRMPTR #1 $t");
-	    emit("MOV $name *$t");
+	    mklbl($name); 
+	    emit('MEM 0');
+	    if(!$nostack) {
+		# put return addr in reserved slot at FRMPTR +1
+		emit("ADD FRMPTR #1 $t");
+		emit("MOV $name *$t");
+	    }
 	    
 	    push @slabels, $name;
 	    #$frmpos = "#$frmpos" unless($frmpos =~/^\@/);
@@ -394,18 +403,22 @@ cardinal: /- ( DIGIT+ )/
 	$isdecl = 1;
         my ($self, $list) = @_;
         return $list unless ref $list;
-	# restore stack ptr (to prev frame)
-	emit("MOV FRMPTR STKPTR");
-	# pop return addr
-        emit("ADD STKPTR #1 STKPTR");
-	emit("MOV *STKPTR $t");
-	# pop prev. frame ptr
-	emit("ADD STKPTR #1 STKPTR");
-	emit("MOV *STKPTR FRMPTR");
-	    
+	
 	my $sub = pop @slabels;
-	#printf "\tJMP *%s\n", $sub;
-	emit("JMP *$t");
+	if($nostack) {
+	    emit("JMP *$sub");
+	} else {
+	    # restore stack ptr (to prev frame)
+	    emit("MOV FRMPTR STKPTR");
+	    # pop return addr
+	    emit("ADD STKPTR #1 STKPTR");
+	    emit("MOV *STKPTR $t");
+	    # pop prev. frame ptr
+	    emit("ADD STKPTR #1 STKPTR");
+	    emit("MOV *STKPTR FRMPTR");
+	    
+	    emit("JMP *$t");
+	}
 	$cursub = undef;
 	
 	return @$list;
@@ -418,33 +431,35 @@ cardinal: /- ( DIGIT+ )/
 
  	while (@$list > 0) {
 	    my ($name, $params) = splice(@$list, 0, 2);
-	    # print "CALL PARAMS: " . Dumper($params);
-	    my $myfrm = $t; ringbuft();
-	    emit("MOV FRMPTR $myfrm");
-	    # push frame ptr, leave one word for ret addr
-	    emit("MOV FRMPTR *STKPTR");
-	    emit("SUB STKPTR #2 STKPTR");
-	    # start new frame
-	    emit("MOV STKPTR FRMPTR");
-	    my @callmode = @{$locsym{$name}}; 
-	    foreach my $obj (@$params) {
-		if(defined $obj) {
-		    my $cm = shift @callmode;
-		    my $locnam = "$cursub:$obj";
-		    # print "CHECKLOC: $locnam $cm\n";
-		    if(exists $locsym{$locnam}) {
-			my ($frmpos, $cby) = @{$locsym{$locnam}};
-			emit("SUB $myfrm #$frmpos $t");
-			emit("MOV *$t $t") unless($cby eq 'val');
-			$obj = "$t";
-		    } else {
-			$obj = "#$obj" unless(($obj =~ /^\@/) or ($cm eq 'val'));
-			$obj = "#$obj" if($obj =~ /^\d+/);
+	    if(!$nostack) {
+		# print "CALL PARAMS: " . Dumper($params);
+		my $myfrm = $t; ringbuft();
+		emit("MOV FRMPTR $myfrm");
+		# push frame ptr, leave one word for ret addr
+		emit("MOV FRMPTR *STKPTR");
+		emit("SUB STKPTR #2 STKPTR");
+		# start new frame
+		emit("MOV STKPTR FRMPTR");
+		my @callmode = @{$locsym{$name}}; 
+		foreach my $obj (@$params) {
+		    if(defined $obj) {
+			my $cm = shift @callmode;
+			my $locnam = "$cursub:$obj";
+			# print "CHECKLOC: $locnam $cm\n";
+			if(exists $locsym{$locnam}) {
+			    my ($frmpos, $cby) = @{$locsym{$locnam}};
+			    emit("SUB $myfrm #$frmpos $t");
+			    emit("MOV *$t $t") unless($cby eq 'val');
+			    $obj = "$t";
+			} else {
+			    $obj = "#$obj" unless(($obj =~ /^\@/) or ($cm eq 'val'));
+			    $obj = "#$obj" if($obj =~ /^\d+/);
+			}
+			emit("MOV $obj *STKPTR");
+			emit("SUB STKPTR #1 STKPTR");
 		    }
-		    emit("MOV $obj *STKPTR");
-		    emit("SUB STKPTR #1 STKPTR");
 		}
-	    }
+	    } 
 	    emit("JSR $name");
 	}
         return @$list;
@@ -575,7 +590,7 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_datastmt {
         my ($self, $list) = @_;
-	my $data = shift $list;
+	my $data = shift @{$list};
 	# print "data: " . Dumper($data);
 	my $first = 1;
 	while(scalar(@$data)) {
@@ -603,7 +618,7 @@ cardinal: /- ( DIGIT+ )/
 
     sub got_readstmt {
         my ($self, $list) = @_;
-	my $read = shift $list;
+	my $read = shift @{$list};
 	#print "read: " . Dumper($read);
 	while(scalar(@$read)) {
 	    my $rdvar = shift @$read;
@@ -665,18 +680,21 @@ cardinal: /- ( DIGIT+ )/
     }	
 }
 
-# cmdline options
-my ($srcfile, $outfile, $helpme);
 our $bits = 10;
 
 GetOptions(
     "help|?" => \$helpme,
     "output=s" => \$outfile,
     "bits=i" => \$bits,
+    "nostack" => \$nostack,
     ) or die("FATAL: Cannot understand options.\n");
 
 my ($srcfile, $endguard) = @ARGV;
-die "Usage: shlc [ -o <outfile> ] srcfile\n" 
+die qq/Usage: shlc [ options ] <srcfile>
+    -h           - this help
+    -o <outfile> - write tac output code to given file instead of stdout
+    -n           - do not implement a stack. Disables reentrancy, paramters and local vars
+/       
     if(!defined $srcfile || defined $endguard || defined $helpme);
 
 my $out = *STDOUT;

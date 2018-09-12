@@ -1,8 +1,8 @@
 //
 // nested sub calls with params
 //
-//pragma dump a
-//
+
+#pragma print a,b
 
 var a <- 2;
 var b <- 3;
@@ -20,3 +20,4 @@ sub plustwo(ref x, y) {
 main {
   call plustwo(a, b);
 }
+

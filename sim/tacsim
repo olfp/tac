@@ -107,7 +107,7 @@ GetOptions(
     ) or die("Fatal error: Cannot understand options\n");
 
 my ($srcfile, $endguard) = @ARGV;
-die qq/Usage: tacsim [ options ] srcfile
+die qq/Usage: tacsim [ options ] <srcfile>
     -h               - this help
     -r <file\@addr>  - read whitespace delimited numbers from file to addr
     -d <n>           - dump ten memloc starting at <n> after run
@@ -681,6 +681,7 @@ sub printline {
 	cmd_punch($wchlst);
     }
     $prompt = "NEXTOP> " if !defined $prompt;
+    # print "PC: $loc MEM: " . $mem[$loc] . " LINE: " . ($mem[$loc]-1) . ": " . $lines[$mem[$loc]-1] . "\n";
     my $lno = $mem[$loc]-1;
     my $line = ($lno >= 0) && exists $lines[$lno]
 	? $lines[$lno] : "<no line here>";
@@ -922,36 +923,34 @@ foreach my $rline (@lines) {
 	$lineno++;
 	next;
     }
-    if($line =~ /^((?|[[:alpha:]]|\.)[[:alnum:]]*)([:=])\s+(\S+)(\s+(\S+))?/) {
-	# print "SYM: $1 $2 /$3/ /$4/ $5\n";
-	# location, label or memory assignemt
+    # do we have a label or a loc assign?
+    if($line =~ /^((?|[[:alpha:]]|\.)[[:alnum:]]*)?([:=])?\s+(\S+)(\s+(\S+))?/) {
+        # print "SYM: $1 $2 /$3/ /$4/ $5\n";
 	if($1 eq '.' && $2 eq '=') {
 	    # set mem ptr
 	    $memptr = $3;
 	    $setmem = 0;
-	} else {
-	    if($2 eq ':' || $2 eq '=') {
-		# label
-		my $cnt = 1;
-		$symtab{uc $1} = [$memptr, $1];
-		if(uc $3 eq 'MEM') {
-		    # mem assign
-		    my $data = $5;
-		    if($data !~ /^(\d+)(\*(\d+))?/) {
-			# symbolic data
-			# print "SYMDAT: $1 ($2) $3 - $data\n";
-			($data, undef) = @{$symtab{uc $data}};
-		    } else {
-			$cnt = defined $3 ? $3 : 1;
-			$data = $1;
-		    }
-		    for(my $n = 0; $n < $cnt; $n++) {
-			# print "SETMEM $cnt $memptr $data\n";
-			$mem[$memptr++] = $data;
-		    }
-		    $setmem = 0;
-		}
+	} elsif($2 eq ':' || $2 eq '=') {
+	    # label
+	    $symtab{uc $1} = [$memptr, $1];
+	}
+	if(uc $3 eq 'MEM') {
+	    # mem assign
+	    my $cnt = 1;
+	    my $data = $5;
+	    if($data !~ /^(\d+)(\*(\d+))?/) {
+		# symbolic data
+		# print "SYMDAT: $1 ($2) $3 - $data\n";
+		($data, undef) = @{$symtab{uc $data}};
+	    } else {
+		$cnt = defined $3 ? $3 : 1;
+		$data = $1;
 	    }
+	    for(my $n = 0; $n < $cnt; $n++) {
+		# print "SETMEM $cnt $memptr $data\n";
+		$mem[$memptr++] = $data;
+	    }
+	    $setmem = 0;
 	}
     }
     if($setmem) {

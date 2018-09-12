@@ -1,0 +1,41 @@
+; shlc SHLA compilation Wed Sep 12 16:09:19 2018
+; this assumes a TAC with 10 bit word width
+; mem locs 1-255 are local local or temporary vars
+RESET:	JMP MAIN
+STKPTR:	MEM 255
+FRMPTR:	MEM 255
+.=	256
+#PRAGMA	print c,n[5]
+i:	MEM 0
+a:	MEM 1014
+b:	MEM 0
+c:	MEM 0
+n:	MEM 0*5
+DATA:	MEM 42
+	MEM 69
+	MEM 96
+	MEM 123
+	MEM 2
+	MEM 3
+	MEM 4
+	MEM 5
+	MEM 1023
+DATPTR:	MEM DATA
+MAIN:	NOP
+L00001:	MOV *DATPTR a
+	ADD DATPTR #1 DATPTR
+	MOV *DATPTR b
+	ADD DATPTR #1 DATPTR
+	CMP a #0
+	JLE L00002
+	ADD #n i 16
+	MUL a b 19
+	MOV 19 *16
+	SUB i #1 21
+	ADD #n 21 22
+	MOV *22 c
+	ADD i #1 24
+	MOV 24 i
+	JMP L00001
+L00002:	HLT
+HEAP:	MEM 0
