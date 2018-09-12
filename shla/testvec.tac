@@ -1,6 +1,6 @@
-; shlc SHLA compilation Wed Sep 12 16:09:19 2018
+; shlc SHLA compilation Wed Sep 12 16:43:55 2018
 ; this assumes a TAC with 10 bit word width
-; mem locs 1-255 are local local or temporary vars
+; mem locs 1-255 are local or temporary vars
 RESET:	JMP MAIN
 STKPTR:	MEM 255
 FRMPTR:	MEM 255

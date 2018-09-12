@@ -6,6 +6,8 @@ var i <- 0, a <- -10, b, c, n[5];
 
 data 42, 69, 96, 123, 2, 3, 4, 5, -1;
 
+// lets go
+
 main {	 
   loop {	
     read a, b;
