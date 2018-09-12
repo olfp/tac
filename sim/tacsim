@@ -75,7 +75,7 @@
   
   Note that the argument to the pragma may not contain spaces!
 
-  Installation: You will need Perl with modules File::Slup and optionan Term::ReadLine::Gnu
+  Installation: You will need Perl with modules File::Slup and optional Term::ReadLine::Gnu
 
 =cut
 
@@ -115,9 +115,8 @@ die qq/Usage: tacsim [ options ] srcfile
     -s <addr=v, ...> - set mem loc list (addrs, symbols and arrays) before run
     -t               - trace mode on
     -g <addr>        - start exeution at address given
-    -e               - exit simulator on halt
     -q               - quiet mode
-    -b <n>           - set word width to <n> bits (default 10)
+    -b <n>           - set word width to <n> bits (default 1)
     -f [dxo]         - set number output format to dec, oct, hex
     -i               - enter interacive monitor after startup
 /
@@ -129,6 +128,7 @@ my $maxcells = 1 << $bits;
 my $maxlines = $maxcells;
 
 # formating
+my %basemap = ('d' => 'decimal', 'x' => 'hexadecimal', 'o' => 'octal');
 my %pfxmap = ('d' => '', 'x' => '0x', 'o' => '0');
 my $pfx = $pfxmap{$fmt};
 my ($numlen, $npic, $tpic, $spic);
@@ -571,6 +571,8 @@ sub docmd {
 	cmd_prline();
     } elsif($cmdln =~/^q$/) {
 	$running = 0;
+    } elsif($cmdln =~/^i$/) {
+	printf "Status: %d bits words, output base is %s.\n", $bits, $basemap{$fmt};
     } elsif($cmdln =~/^s$/) {
 	foreach my $sym (sort keys %symtab) {
 	    my ($addr, $name) = @{$symtab{$sym}};
@@ -614,6 +616,7 @@ sub docmd {
 	When entering from to range second value may be +x)
 	<cr> \t\t- pressing return executes the next operation
 	. \t\t- print the current operation (not yet executed)
+	i \t\t- info on bit size and number base
 	t \t\t- toggle trace mode on or off
 	s \t\t- print symbol table
 	b <a> \t\t- set breakpoint at addr <a>
