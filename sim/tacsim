@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 
 =for tac cpu
-  tac - the three address code machine simulatur/interpreter
+  tac - the three address code machine simulator/interpreter
 
   Implements a virtual cpu with the following commands, involving up 
   to three memory locations. Internal state is the program stata word

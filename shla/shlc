@@ -201,7 +201,7 @@ cardinal: /- ( DIGIT+ )/
 	my $val = 0;
 	$val = "0*$dim" if $dim;
 	if($isdecl) {
-	    print "$var=\tMEM $val\n";
+	    print "$var:\tMEM $val\n";
 	} else {
 	    if($islocal) {
 		my $locnam = "$cursub:$var";
