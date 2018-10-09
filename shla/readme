@@ -1,5 +1,7 @@
 shlc is a shla (pronounced "shiela") compiler.
 
+To run you need Perll with the Pegex module installed.
+
 This shlc compiles to tac assembler. Shla is the simple high-level language.
 The shla syntax is vaguely C like, while simpler. There is only one
 datatype, the machine word (like BCPL). There are array (of words).
