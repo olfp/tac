@@ -14,7 +14,7 @@ sub swap(ref a, ref b) {
     b <- t;
 }
 
-sub fill(d) {
+sub fill(ref d) {
     local i <- 0;
 
     loop {
