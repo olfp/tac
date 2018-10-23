@@ -1,0 +1,46 @@
+// bubble sort in shla
+
+#pragma print data[10]
+
+var data[10], i, o, c;
+
+data 43,96,69,13,21,7,66,69,99,1;
+
+sub swap(ref a, ref b) {
+    local t;
+
+    t <- a;
+    a <- b;
+    b <- t;
+}
+
+main {
+    // fill data array
+    i <- 0;
+    loop {
+        stop on(i > 9);
+        read data[i];
+        i <- i + 1;
+    }
+    // sort array ascending
+    o <- 9; // outer loop counter 9..0
+    loop {
+        // each outer loop pass moves the biggest element to the Klassenobjekten
+        // every pass is one element shorter
+        c <- 0; // counter for swaps
+        i <- 0; // inner loop counter 0..o-1
+        loop {
+            // each inner loop compares to adjacent elements and swaps if needed
+            // the loop runs up to the last unsorted element, as determined by the
+            // outer loops bound o
+            stop on (i = o);
+            if(data[i] > data[i+1]) {
+                call swap(data[i], data[i+1]);
+                c <- c + 1;
+            }
+            i <- i + 1;
+        }
+        o <- o - 1;
+        stop on (c = 0); // stop when no swaps -> sorted!
+    }
+}
