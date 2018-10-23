@@ -14,14 +14,18 @@ sub swap(ref a, ref b) {
     b <- t;
 }
 
-main {
-    // fill data array
-    i <- 0;
+sub fill(d) {
+    local i <- 0;
+
     loop {
         stop on(i > 9);
-        read data[i];
+        read d[i];
         i <- i + 1;
     }
+}
+
+main {
+    call fill(data);
     // sort array ascending
     o <- 9; // outer loop counter 9..0
     loop {
