@@ -854,7 +854,7 @@ sub cmd_punch {
 sub cmd_dump {
     my ($first, $last) = symres(@_);
     return if !defined $first;
-    $last = $first + 10 if !defined $last;
+    $last = $first + 9 if !defined $last;
     showmem("", $first, $last);
 }
 
@@ -1121,7 +1121,7 @@ if(defined $goto) {
 } else {
     $goto = $memptr;
 }
-print "RUNNING from $goto.\n" unless $quiet;
+print "TACSIM: RUNNING from $goto.\n" unless $quiet;
 
 $lineno = $mem[$memptr];
 

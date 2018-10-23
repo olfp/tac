@@ -455,6 +455,7 @@ cardinal: /- ( DIGIT+ )/
                         } else {
                             $obj = "#$obj" unless(($obj =~ /^\@/) or ($cm eq 'val'));
                             $obj = "#$obj" if($obj =~ /^\d+/);
+                            $obj =~ s/^#\*(.*)$/\1/; # array access make imm-ind :-/
                         }
                         emit("MOV $obj *STKPTR");
                         emit("SUB STKPTR #1 STKPTR");
