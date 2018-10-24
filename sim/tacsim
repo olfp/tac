@@ -151,7 +151,7 @@ to the tacsim command or embeded in the source code via
 
 =item #pragma dump <addr>
 
-=item #pragma print <list of variables, array, addresses>
+=item #pragma print <list of variables, arrays, addresses>
 
 =back
 
