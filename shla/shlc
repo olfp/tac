@@ -384,7 +384,7 @@ cardinal: /- ( DIGIT+ )/
             $locsym{$name} = \@callmode;
 
             mklbl($name);
-            emit('MEM 0');
+            emit('SRS');
             if(!$nostack) {
                 # put return addr in reserved slot at FRMPTR +1
                 emit("ADD FRMPTR #1 $t");
@@ -578,7 +578,7 @@ cardinal: /- ( DIGIT+ )/
             while (@$list > 1) {
                 my ($var, $idx) = splice(@$list, 0, 2);
                 #print "PreScope: $var $idx\n";
-                $var = scope($var, 'array');
+                $var = scope($var, 'array,persist');
                 #print "PostScope: $var $idx\n";
                 $idx = scope($idx);
                 # use addr not content if not pointer

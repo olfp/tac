@@ -1,8 +1,8 @@
 // bubble sort in shla
 
-#pragma print data[10]
+#pragma print array[10]
 
-var data[10], i, o, on;
+var array[10], i, o, on;
 
 data 43,96,69,13,21,7,66,69,99,1;
 
@@ -14,18 +14,19 @@ sub swap(ref a, ref b) {
     b <- t;
 }
 
-sub fill(ref d) {
-    local i <- 0;
+sub fill(ref a) {
+    local x, i <- 0;
 
     loop {
         stop on(i > 9);
-        read d[i];
+        read x;
+        a[i] <- x;
         i <- i + 1;
     }
 }
 
 main {
-    call fill(data);
+    call fill(array);
     // sort array ascending
     o <- 9; // outer loop counter 9..0
     loop {
@@ -39,8 +40,8 @@ main {
             // outer loops bound o. The rightmost swap determins the highest
             // still unsorted element and is the upper bound for the next outer loop.
             stop on (i = o);
-            if(data[i] > data[i+1]) {
-                call swap(data[i], data[i+1]);
+            if(array[i] > array[i+1]) {
+                call swap(array[i], array[i+1]);
                 on <- i + 1; // advance next outer loop bound to swapper element
             }
             i <- i + 1;

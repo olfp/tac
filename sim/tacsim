@@ -121,6 +121,11 @@ jcs (carry flag set), jcc (carry clear)
 
 set one or more memory cells at the current location to the given value.
 
+=item srs
+
+set a retrun slot (at subroutine start). Equivalent to mem 0 but tracable
+(generates a source line).
+
 =item .= <val>
 
 sets the location to the given value
@@ -516,6 +521,12 @@ sub tac_jsr {
     return $res;
 }
 
+sub tac_srs {
+    prtrace("SRS") if $trace;
+    $mem[$memptr++] = 0;
+    return 0;
+}
+
 sub tac_jeq {
     my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
@@ -764,8 +775,13 @@ sub printline {
     $prompt = "NEXTOP> " if !defined $prompt;
     # print "PC: $loc MEM: " . $mem[$loc] . " LINE: " . ($mem[$loc]-1) . ": " . $lines[$mem[$loc]-1] . "\n";
     my $lno = $mem[$loc]-1;
-    my $line = ($lno >= 0) && exists $lines[$lno]
-    ? $lines[$lno] : "<no line here>";
+    my $line = sprintf("\t  MEM $npic", $mem[$loc]); # default is no line
+    if(($lno > 0) && exists $lines[$lno]) {
+        $line = $lines[$lno];
+        $lno++;
+    } else {
+        $lno = "--";
+    }
     printf("$prompt$npic($lno): %s\n", $loc, $line) if ($loc >= 0);
 }
 
@@ -829,7 +845,7 @@ sub cmd_list {
         } else {
             $last = defined $last ? $1 : $first + 10;
         }
-        if($first lt 1 || $last gt scalar(@lines)) {
+        if($first < 1 || $last > scalar(@lines)) {
             print "Error: Line number(s) out of range (1.." . scalar(@lines) . ").\n";
             return;
         }
