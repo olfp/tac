@@ -19,8 +19,7 @@ sub fill(ref a) {
 
     loop {
         stop on(i > 9);
-        read x;
-        a[i] <- x;
+        read a[i];
         i <- i + 1;
     }
 }
