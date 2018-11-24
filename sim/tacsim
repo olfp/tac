@@ -36,8 +36,9 @@ leading hash (#) denotes immediate value (imm): arg
 
 =item -
 
-an offset/index can be added in brackets. It will be added after indirection (if any).
-Example: *foo[12] with foo containing 42 will result in 54.
+an offset/index can be added in brackets. It will be added
+after indirection (if any).
+Example: foo[12] with foo containing 42 will result in 54.
 
 =back
 
@@ -61,7 +62,7 @@ leading asterisk (*) denotes indirection (ind): mem[arg]
 
 =item <imm-or-addr> : either #<imm> or <addr> or *<addr>
 
-=item <dir-or-ind> : either <addr> or *<addr>
+=item <dir-or-ind> : either <addr> or *<addr> or *<addr>[offs]
 
 =back
 
