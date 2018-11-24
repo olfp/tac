@@ -8,7 +8,7 @@
 
 Implements a virtual cpu with the following commands, involving up
 to three memory locations. Internal state is the program status word
-(PSW) consisting of the current program locaion (address) and three
+(PSW) consisting of the current program location (address) and three
 flags: Zero, Negative and Carry
 
 The source lines are interpreted directly without transfer to binary
@@ -88,7 +88,7 @@ Commands: shl/shr/rol/ror
 
     cmp <imm-or-addr> <imm-or-addr>
 
-=head4 Branching (jump if compare fullfills condition)
+=head4 Branching (compare and jump if compare fullfills condition)
 
 beq (equal, zero flag set), bne (not equal), ble (less, negative flag set),
 bgt (greater)
@@ -105,7 +105,7 @@ jcs (carry flag set), jcc (carry clear)
 
 =head4 Jump to Subroutine
 
-    jsr <dir-or-ind> (move retvec <addr>, jmp <addr+1>)
+    jsr <dir-or-ind> (mov retvec <addr>, jmp <addr+1>)
 
 =head4 Miscelaeneous: Clear carry flag, no-operation, halt
 
@@ -159,7 +159,7 @@ Note that the argument to the pragma may not contain spaces!
 
 =head2 Installation:
 
-You will need Perl with modules File::Slup and optional Term::ReadLine::Gnu
+You will need Perl with modules File::Slurp and optional Term::ReadLine::Gnu
 
 =cut
 
@@ -246,8 +246,9 @@ sub taceval {
         $wordno++;
         last WORD if $word =~ /^;/; # discard word after comment sign ';'
         if(($wordno == 1) && ($word =~ /^[[:alpha:]][[:alnum:]]*[:=]$/)) {
-            # a word in first position starting with a alpha char is a label
-            # or a memory assignment already processed in first pass
+            # a word in first position starting with a alpha char and ending
+            # in = or : is a label or a memory assignment already processed
+            # in first pass
         } else {
             # cmd or arg
             # print "WORK: $word\n";
