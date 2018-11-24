@@ -34,6 +34,11 @@ leading asterisk (*) denotes indirection (ind): mem[mem[arg]]
 
 leading hash (#) denotes immediate value (imm): arg
 
+=item -
+
+an offset/index can be added in brackets. It will be added after indirection (if any).
+Example: *foo[12] with foo containing 42 will result in 54.
+
 =back
 
 =head4 For jump instructions there is one level of indirection less:
@@ -259,8 +264,8 @@ sub taceval {
             } else {
                 # its an arg
                 # print "ARG $word\n";
-                if($word =~ /^([#*\@]?)(\S+)$/) {
-                    @val = [$2, $1]; # value, mode
+                if($word =~ /^([#*\@]?)(\S+)(\[d+\])?$/) {
+                    @val = [$2, $1, $3]; # value, mode, offs
                 } else {
                     # empty word
                 }
@@ -293,9 +298,10 @@ sub tacargs {
     } else {
         foreach my $arg (@_) {
             my $dir = shift @{$dirind};
-            my ($val, $mode) = @{ $arg };
+            my ($val, $mode, $offs) = @{ $arg };
             # print "TACARG: $val, $mode, $dir\n";
             $trace .= " $mode$val";
+	    $trace .= "[$offs]" if $offs;
             if($val =~ /^(\D\S*)/) {
                 # does not start with a digit -> label
                 if(!exists($symtab{uc $val})) {
@@ -307,7 +313,7 @@ sub tacargs {
                     print STDERR "Warning: Undefined symbol $1 in line $lineno\n";
                 }
             }
-            # print "SYMREF: $val, $mode, $dir\n";
+            # print "SYMREF: $val, $mode, $offs, $dir\n";
             if($mode eq '*') {
                 # val is addr
                 $val = $mem[$val];
@@ -319,6 +325,10 @@ sub tacargs {
                 $trace .= "=$val";
             }
             push @fixed, 0+$val;
+	    if($offs) {
+		$val += $offs;
+		$trace .= "[$offs]";
+	    }
         }
     }
     #print "FIX: " . Dumper(@fixed);

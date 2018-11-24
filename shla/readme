@@ -103,4 +103,98 @@ $ shlc testodd.shl -o testodd.tac
 $ tacsim -q testodd.tac -p res[10] 
 res[10] 0102: 0001 0003 0005 0007 0000 0000 0000 0000 0000 0000
 
-     
+
+Implementation notes:
+Normaly shlc implements a software stack for parameter passing and
+allocation of local vars. When run with -n (nostack) this is omitted.
+Currently this means cal params and locals are not implemented.
+
+Suggestion: Implement a static calling convention, lifting this
+restriction. Reentrancy/recursion of course will continue not to work.
+Attention: This needs the ability to adress *FOO+X aka (*FOO)+X not *(FOO+X)
+which is currently unsupported (indirect indexed adressing)
+
+Caller:
+
+ARG1:	MEM 43
+ARG2=	69
+
+	JSR MYSUB		; Jump to subroutine
+	MEM ARG1		; First arg, call by ref
+	MEM ARG2		; Second (and last) arg, call by value
+CONT:	... 			; Sub needs to return here
+
+Callee:
+
+MYSUB:	SRS
+	...
+	MOV *MYSUB TEMP		; Return adress points to first arg, is ref	
+	ADD *TEMP *MYSUB+1 RES	; Add value of first arg with second (value)
+	..
+	JMP *MYSUB+2  	    	; Jumps over the two args, to CONT
+
+Locals can be allocated just before the entry point:
+
+Callee:
+
+MYSL1:	MEM 0			; First local
+MYSL2:	MEM 42			; Second local, non-tero init
+MYSUB:	SRS
+	...
+	ADD MYSUB-1 MYSUB-2 RES	; Locals cann be accessed relative to entry point
+	SUB MYSL1 MYSL2 RES 	; or labels con be given for locals (but in global name space)
+	...
+	JMP *MYSUB
+
+Another Example:
+
+Caller:
+
+VARA:	13
+VARB:	42
+	...
+	JSR SWAP
+	MEM VARA		; Adress of first arg (call by ref)
+	MEM VARB		; Adress of second arg
+	...
+	
+Now VARA is 42 and VARB is 13.	
+
+Callee:
+
+LOCT:	MEM 0
+SWAP:	SRS
+	MOV *SWAP LOCT
+	MOV *SWAP+1 *SWAP
+	MOV LOCT *SWAP+1
+	JMP *SWAP+2
+
+If extending the TAC with indexed indrect adressing is not desirable,
+the params can be storted before the subroutine as with locals:
+
+Caller:
+
+VARA:	13
+VARB:	42
+VALC=	69
+	...
+	MOV #VARA, SWAP-1
+	MOV #VARB, SWAP-2
+	MOV #VALC, SWAP-3
+	JSR SWAP
+	...
+
+Callee:
+
+TEMP:	MEM 0
+	MEM 0			; 3rd param
+	MEM 0			; 2nd param
+	MEM 0			; 1st param
+SWAP:	SRS
+	MOV *(SWAP-1) TEMP
+	MOV *(SWAP-1) *(SWAP-2)
+	MOV TEMP *(SWAP-2)
+	...
+	JMP *SWAP
+
+# EOF
