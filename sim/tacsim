@@ -36,9 +36,11 @@ leading hash (#) denotes immediate value (imm): arg
 
 =item -
 
-an offset/index can be added in brackets. It will be added
+an offset can be added in parentheses. It will be added
 after indirection (if any).
-Example: foo[12] with foo containing 42 will result in 54.
+Example: foo(12) with foo containing 42 will result in 54.
+Use: *idx(base) will give the value at base indexed with contents of idx
+This is an array op, i.e. base[idx] = *idx(base) = base + *idx
 
 =back
 
