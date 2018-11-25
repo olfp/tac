@@ -96,15 +96,17 @@ Commands: shl/shr/rol/ror
 
 =head4 Branching (compare and jump if compare fullfills condition)
 
-beq (equal, zero flag set), bne (not equal), ble (less, negative flag set),
-bgt (greater)
+beq (equal, zero flag set), bne (not equal), ble (less or equal,
+zero or negative flag set), blt (less than, negative flag set),
+bge (greater or equal, zero flag set or negative clear),
+bgt (greater, negative clear)
 
     beq <imm-or-addr> <imm-or-addr> <dir-or-ind>
 
 =head4 Jumping
 
 jmp, jeq (equal, zero flag set), jne (not equal),
-jle (less, i.e. negative flag set), jgt (greater),
+jlt (less, i.e. negative flag set), jgt (greater),
 jcs (carry flag set), jcc (carry clear)
 
     jmp <dir-or-ind>
@@ -257,19 +259,21 @@ sub taceval {
             # in first pass
         } else {
             # cmd or arg
-            # print "WORK: $word\n";
+            # print "WORD: $word\n";
             my $subname = "tac_" . lc $word;
             if(my $proc = __PACKAGE__->can($subname)) {
+                # print "CMD: $subname\n";
                 $cmdproc = $proc;
                 # valid command
             } else {
                 # its an arg
                 # print "ARG $word\n";
-                if($word =~ /^([#*\@]?)(\S+)(\[d+\])?$/) {
-                    @val = [$2, $1, $3]; # value, mode, offs
+                if($word =~ /^([#*\@]?)([[:alnum:]\+\-\*\/]+)(\(([[:alnum:]\+\-\*\/]+)\))?$/) {
+                    @val = [$2, $1, $4]; # value, mode, offs
                 } else {
                     # empty word
                 }
+                # print "ARG PUSH: " . Dumper(@val) . "\n";
                 push @arglist, @val;
             }
         }
@@ -289,47 +293,76 @@ sub taceval {
     $memptr = $nxtloc if($nxtloc > 0);
 }
 
+sub tacsym {
+    my ($val, $trace, $offs) = @_;
+
+    # print "TACSYM: $val\n";
+    if($val =~ /^(\D[[:alnum:]]*)([\+\-\*\/]\S+)?/) {
+        # does not start with a digit -> label
+        my $expr = $2;
+        $val = $1;
+        # print "TACSYM: Sym: $val Expr: $expr\n";
+        if(!exists($symtab{uc $val})) {
+            print "TACSYM: $val not in symtab!\n";
+            undef $val;
+        } else {
+            ($val, undef) = @{$symtab{uc $val}};
+            # print "TACSYM: Lookup -> $val ( ex: $expr)\n";
+            $val = eval "$val$expr";
+            # print "TACSYM: Add expr $expr --> $val\n";
+            if($trace) {
+                $trace .= "[$val";
+                if($offs) {
+                    $trace .= "($offs)";
+                }
+                $trace .= "]";
+            }
+        }
+        if(!defined $val || !$val) {
+            print STDERR "Warning: Undefined symbol \"$1\" in line $lineno\n";
+        }
+    }
+    # print "TACSYM: Return -> ($val, $trace)\n";
+    return ($val, $trace);
+}
+
 sub tacargs {
     my @fixed = ();
     my $trace = "";
     my $dirind = shift; # Array of R)ead, W)rite, J)ump
     my $argcnt = scalar @{$dirind};
     if($argcnt != scalar(@_)) {
-        print "Error: Expected $argcnt operands in line $lineno.\n";
+        print "Error: Expected $argcnt operands, got " . @_ . " in line $lineno.\n";
     } else {
         foreach my $arg (@_) {
             my $dir = shift @{$dirind};
             my ($val, $mode, $offs) = @{ $arg };
-            # print "TACARG: $val, $mode, $dir\n";
+            # print "TACARG: $val [ $offs ], $mode, $dir\n";
             $trace .= " $mode$val";
-	    $trace .= "[$offs]" if $offs;
-            if($val =~ /^(\D\S*)/) {
-                # does not start with a digit -> label
-                if(!exists($symtab{uc $val})) {
-                    die "Undefined value in arg($val, $mode, $dir) at loc $memptr, line " . $mem[$memptr] . "\n" . $lines[$mem[$memptr]-1] . "\n";
-                }
-                ($val, undef) = @{$symtab{uc $val}};
-                $trace .= "($val)";
-                if(!$val) {
-                    print STDERR "Warning: Undefined symbol $1 in line $lineno\n";
-                }
-            }
+            $trace .= "($offs)" if $offs;
+            ($offs, undef) = tacsym($offs);
+            # print "TACARG: Offset: $offs\n";
+            # $trace .= ">[$offs]" if $offs;
+            ($val, $trace) = tacsym($val, $trace, $offs);
             # print "SYMREF: $val, $mode, $offs, $dir\n";
-            if($mode eq '*') {
-                # val is addr
+            my $oval = $val;
+            if($mode ne '#' && ($dir eq 'R' || ($dir eq 'W' && $offs))) {
+                # reading, direct and indirect
                 $val = $mem[$val];
-                $trace .= "->" . (exists $revtab{$val} ? $revtab{$val} : "$val");
+            }
+            if($offs) {
+                $val += $offs;
+            }
+            if($mode eq '*' && !($dir eq 'W' && $offs)) {
+                # val is addr
+                $oval = $val;
+                $val = $mem[$val];
+                $trace .= "->" . (exists $revtab{$oval} ? $revtab{$oval} : "$oval");
             }
             if($mode ne '#' && $dir eq 'R') {
-                # reading,  direct and indirect
-                $val = $mem[$val];
                 $trace .= "=$val";
             }
             push @fixed, 0+$val;
-	    if($offs) {
-		$val += $offs;
-		$trace .= "[$offs]";
-	    }
         }
     }
     #print "FIX: " . Dumper(@fixed);
@@ -555,11 +588,11 @@ sub tac_jne {
     return $cond{'Z'} ? 0 : $res;
 }
 
-sub tac_jle {
+sub tac_jlt {
     my @args = tacargs(['J'], @_);
     my $argtrace = pop @args;
     my $res = tacscale($args[0], 'nocond');
-    prtrace("JLE", $argtrace, undef, 'cond') if $trace;
+    prtrace("JLT", $argtrace, undef, 'cond') if $trace;
     return $cond{'N'} ? $res : 0;
 }
 
@@ -607,6 +640,16 @@ sub tac_bne {
     return $cond{'Z'} ? 0: $args[2];
 }
 
+sub tac_blt {
+    my @args = tacargs(['R', 'R', 'J'], @_);
+    my $argtrace = pop @args;
+    my $res = $args[0] - $args[1];
+    $cond{'C'} = ($res & $maxcells) ? 1 : 0;
+    $res = tacscale($res, 'nowarn');
+    prtrace("BLT", $argtrace, undef, 'cond') if $trace;
+    return $cond{'N'} ? $args[2] : 0;
+}
+
 sub tac_ble {
     my @args = tacargs(['R', 'R', 'J'], @_);
     my $argtrace = pop @args;
@@ -614,7 +657,7 @@ sub tac_ble {
     $cond{'C'} = ($res & $maxcells) ? 1 : 0;
     $res = tacscale($res, 'nowarn');
     prtrace("BLE", $argtrace, undef, 'cond') if $trace;
-    return $cond{'N'} ? $args[2] : 0;
+    return $cond{'N'} || $cond{'Z'} ? $args[2] : 0;
 }
 
 sub tac_bgt {
@@ -625,6 +668,16 @@ sub tac_bgt {
     $res = tacscale($res, 'nowarn');
     prtrace("BGT", $argtrace, undef, 'cond') if $trace;
     return $cond{'N'} || $cond{'Z'} ? 0 : $args[2];
+}
+
+sub tac_bge {
+    my @args = tacargs(['R', 'R', 'J'], @_);
+    my $argtrace = pop @args;
+    my $res = $args[0] - $args[1];
+    $cond{'C'} = ($res & $maxcells) ? 1 : 0;
+    $res = tacscale($res, 'nowarn');
+    prtrace("BGE", $argtrace, undef, 'cond') if $trace;
+    return $cond{'N'} ? 0 : $args[2];
 }
 
 sub tac_nop {
@@ -732,7 +785,7 @@ sub docmd {
         p <a>[, <b> ..]\t- print items, may be addrs, symbols or arrays
         w <a>[, <b> ..]\t- watch items, like p, enter w ? for help
         w \t\t- print list of watched items (printed on each break)
-        wc \t\t- cleat list of watched items
+        wc \t\t- clear list of watched items
         e <a> <v>[,<v>]\t- enter values into memory beginning at addr <a>
         z <a>[, <b>] \t- zero memory from addr <a> to <b>
         g [<a>] \t- go from addr <a> or current addr\n/;
@@ -1093,7 +1146,7 @@ foreach my $rline (@lines) {
 }
 
 while(my($sym,  $val) = each(%symtab)) {
-    $revtab{$val->[0]} = $val->[1] . "(" . $val->[0] . ")";
+    $revtab{$val->[0]} = $val->[1] . "[" . $val->[0] . "]";
 }
 
 if(defined($datafile)) {
