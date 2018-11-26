@@ -1,0 +1,25 @@
+; TACcc compilation Thu Mar  2 16:20:15 2017
+; mem locs 0-99 are temp vars for expr eval
+RESET:	JMP MAIN
+.=	100
+a=	MEM 0
+b=	MEM 1014
+L00inc:	MEM 0
+	ADD a #1 0
+	MOV 0 a
+	JMP *L00inc
+MAIN:	NOP
+L00001:	COM b 1
+	CMP 1 a
+	JLZ L00002
+	JZE L00002
+	JSR L00inc
+	JMP L00003
+L00002:	MOV #12 a
+L00003:	NOP
+L00004:	CMP a 0
+	JLZ L00005
+	SUB a #1 2
+	MOV 2 a
+	JMP L00004
+L00005:	HLT

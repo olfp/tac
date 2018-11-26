@@ -1,0 +1,110 @@
+tac - the three address code machine simulator/interpreter
+  Description
+    Implements a virtual cpu with the following commands, involving up to
+    three memory locations. Internal state is the program status word (PSW)
+    consisting of the current program location (address) and three flags:
+    Zero, Negative and Carry
+
+    The source lines are interpreted directly without transfer to binary
+    format, so a memory cell stores either data or a source line number.
+
+    Source lines consist of an optional label terminated with a colon (:)
+    and the tac command with up to three arguments. Everything from a
+    semicolon(;) on is a comment.
+
+    Argument syntax:
+    - normal arg is direct (dir) address; leading at-sign(@) is optional:
+      mem[arg]
+
+    - leading asterisk (*) denotes indirection (ind): mem[mem[arg]]
+
+    - leading hash (#) denotes immediate value (imm): arg
+
+    - an offset/index can be added in brackets. It will be added after
+      indirection (if any). Example: foo[12] with foo containing 42 will
+      result in 54.
+
+    For jump instructions there is one level of indirection less:
+    - normal arg is direct (dir) address: arg
+
+    - leading asterisk (*) denotes indirection (ind): mem[arg]
+
+    Address-Abbreviations:
+    <imm-or-addr> : either #<imm> or <addr> or *<addr>
+    <dir-or-ind> : either <addr> or *<addr> or *<addr>[offs]
+
+  Operations:
+    Move first argument to second
+        mov <imm-or-addr> <dir-or-ind>
+
+    Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
+    may set carry flag
+
+        add <imm-or-addr> <imm-or-addr> <dir-or-addr>
+
+    Monadic arithmetic/logic (com[plement], not)
+        com <imm-or-addr> <dir-or-addr>
+
+    Bit shifting
+    (logical or arithmentc, shift or rotate, left or right, with or without
+    carry) Implemented: logical shift/rotate left/right with carry Commands:
+    shl/shr/rol/ror
+
+        shl <imm-or-addr> <dir-or-addr>
+
+    Compare (like sub but only sets flag zero, negative and/or carry)
+        cmp <imm-or-addr> <imm-or-addr>
+
+    Branching (compare and jump if compare fullfills condition)
+    beq (equal, zero flag set), bne (not equal), ble (less, negative flag
+    set), bgt (greater)
+
+        beq <imm-or-addr> <imm-or-addr> <dir-or-ind>
+
+    Jumping
+    jmp, jeq (equal, zero flag set), jne (not equal), jle (less, i.e.
+    negative flag set), jgt (greater), jcs (carry flag set), jcc (carry
+    clear)
+
+        jmp <dir-or-ind>
+
+    Jump to Subroutine
+        jsr <dir-or-ind> (mov retvec <addr>, jmp <addr+1>)
+
+    Miscelaeneous: Clear carry flag, no-operation, halt
+        clc
+        nop
+        hlt
+
+    Pseudoops:
+    mem <val>[*<cnt>]
+      set one or more memory cells at the current location to the given
+      value.
+
+    srs
+      set a retrun slot (at subroutine start). Equivalent to mem 0 but
+      tracable (generates a source line).
+
+    .= <val>
+      sets the location to the given value
+
+    On program start a data file may be read into a specified address range
+    and after program termination data contents may be printed. Also the
+    word width of the machine can be set on startup. This can either be
+    configured via the -b (bits), -r (read), -p (print) and -d (dump)
+    command line switches to the tacsim command or embeded in the source
+    code via #pragma pseudo-ops.
+
+    #pragma bits <num>
+    #pragma read <file@addr>
+    #pragma dump <addr>,<addr>
+    #pragma dump <addr>,+<cnt>
+    #pragma dump <addr>
+    #pragma print <list of variables, arrays, addresses>
+
+    Note that the argument to the pragma may not contain spaces!
+
+  Installation:
+    You will need Perl with modules File::Slurp and optional
+    Term::ReadLine::Gnu
+
