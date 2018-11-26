@@ -1,0 +1,28 @@
+; bubblesort in pseudo high level language (tal)
+; basic version: sort 10 values
+
+init:   goto start
+
+	data[10] <- (43 96 69 13 21 7 66 69 99 1)
+
+	t <- 0                          ; temp var for swap
+	i <- 0                          ; inner loop counter
+	n <- 0                          ; index of swapped item
+	o <- 9                          ; inner loop upper bound
+
+start:  n <- #1                         ; reset upper bound to min
+        i <- #0                         ; reset lower bound
+loop:   if i=o goto break               ; upper bound reached?
+        if data(i)<=data+1(i) goto skip ; data[i] <= data[i+1]?
+        t <- data(i)                    ; swap, data[i] > data[i+1]
+        data(i) <- data+1(i)
+        data+1(i) <- t
+        n <- i + #1
+skip:   i <- i + #1
+        goto loop
+break:  o <- n                          ; last swap is new upper bound
+        if o>#1 goto start              ; stop if less the two unsorted
+
+	print data[10]
+
+; eof
