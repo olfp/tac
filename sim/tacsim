@@ -36,13 +36,34 @@ leading hash (#) denotes immediate value (imm): arg
 
 =item -
 
-an offset can be added in parentheses. It will be added
-after indirection (if any).
-Example: foo(12) with foo containing 42 will result in 54.
-Use: *idx(base) will give the value at base indexed with contents of idx
-This is an array op, i.e. base[idx] = *idx(base) = base + *idx
+an offset-address can be given in parentheses. It is subject to the usual
+sigils (# for immediate, * for indirect, @ or none for address). The
+offset is evaluated and added to the base address. This results in:
+
+=over 2
+
+=item *
+
+base(index) => mem[index]+base 
+
+=item *
+
+base(#index) => index+base
+
+=item *
+
+base(*index) => mem[mem[index]]+base
 
 =back
+
+The whole addres expression can the be modified with another sigil (in front)
+to make the result an immediate or indirect value.
+
+=back
+
+Addresses can be given either a a number or a symbol expression. Symbol
+expressions start with a symbol name optionally followed by basic 
+arithmetic expressions (+, -, *, / Example: base+2*3)
 
 =head4 For jump instructions there is one level of indirection less:
 
@@ -62,9 +83,9 @@ leading asterisk (*) denotes indirection (ind): mem[arg]
 
 =over 2
 
-=item <imm-or-addr> : either #<imm> or <addr> or *<addr>
+=item <imm-or-addr> : either #<imm> or <addr> or *<addr> with optional (offs)
 
-=item <dir-or-ind> : either <addr> or *<addr> or *<addr>[offs]
+=item <dir-or-ind> : either <addr> or *<addr> with optional (offs)
 
 =back
 
@@ -305,7 +326,7 @@ sub tacsym {
         $val = $1;
         # print "TACSYM: Sym: $val Expr: $expr\n";
         if(!exists($symtab{uc $val})) {
-            print "TACSYM: $val not in symtab!\n";
+            # print "TACSYM: $val not in symtab!\n";
             undef $val;
         } else {
             ($val, undef) = @{$symtab{uc $val}};
@@ -341,21 +362,23 @@ sub tacargs {
             my ($val, $mode, $offs) = @{ $arg };
             # print "TACARG: $val [ $offs ], $mode, $dir\n";
             $trace .= " $mode$val";
-            $trace .= "($offs)" if $offs;
-            ($offs, undef) = tacsym($offs);
-            # print "TACARG: Offset: $offs\n";
-            # $trace .= ">[$offs]" if $offs;
+	    if(defined $offs) {
+		$trace .= "($offs)";
+		($offs, undef) = tacargs(['R'], ([$offs, '', undef]));
+		# print "TACARG: Offset: $offs\n";
+		# $trace .= ">[$offs]" if $offs;
+	    }
             ($val, $trace) = tacsym($val, $trace, $offs);
-            # print "SYMREF: $val, $mode, $offs, $dir\n";
+            # print "SYMREF: $val, $mode, $offs, $dir\n" if(defined $offs);
             my $oval = $val;
-            if($mode ne '#' && ($dir eq 'R' || ($dir eq 'W' && $offs))) {
-                # reading, direct and indirect
-                $val = $mem[$val];
-            }
             if($offs) {
                 $val += $offs;
             }
-            if($mode eq '*' && !($dir eq 'W' && $offs)) {
+            if($mode ne '#' && $dir eq 'R') {
+                # reading, direct and indirect
+                $val = $mem[$val];
+            }
+            if($mode eq '*') {
                 # val is addr
                 $oval = $val;
                 $val = $mem[$val];
@@ -804,6 +827,7 @@ sub symres {
     my $this;
     my $last = 0;
     foreach my $addr (@toks) {
+	# print "SYMRES: $addr\n";
         next if $addr =~ /^$/;
         if($addr =~ /^(\+?)([0-9]+)$/ or $addr =~ /^(\+?)(?:0x)([0-9a-f]+)$/i) {
             my $num = $2;
