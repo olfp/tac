@@ -23,6 +23,6 @@ skip:   i <- i + #1
 break:  o <- n                          ; last swap is new upper bound
         if o>#1 goto start              ; stop if less the two unsorted
 
-	print data[10]
+        print data[10]
 
 ; eof
