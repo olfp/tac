@@ -44,7 +44,7 @@ offset is evaluated and added to the base address. This results in:
 
 =item *
 
-base(index) => mem[index]+base 
+base(index) => mem[index]+base
 
 =item *
 
@@ -62,7 +62,7 @@ to make the result an immediate or indirect value.
 =back
 
 Addresses can be given either a a number or a symbol expression. Symbol
-expressions start with a symbol name optionally followed by basic 
+expressions start with a symbol name optionally followed by basic
 arithmetic expressions (+, -, *, / Example: base+2*3)
 
 =head4 For jump instructions there is one level of indirection less:
@@ -174,6 +174,8 @@ to the tacsim command or embeded in the source code via
 
 =item #pragma bits <num>
 
+=item #pragma memory <file@addr>
+
 =item #pragma read <file@addr>
 
 =item #pragma dump <addr>,<addr>
@@ -205,11 +207,13 @@ use Text::Tabs;
 # cmdline options
 my $bits = 10; # default: 10 bits, 1024 memory cells, max unsigned is 1023
 my $fmt = 'd'; # number output defaults to decimal
-my ($srcfile, $datafile, $helpme, $dumps, $punch, $trace, $quiet, $setvar, $goto, $inter);
+my ($srcfile, $readfile, $datafile, $datasect, $helpme, $dumps, $punch,
+    $trace, $quiet, $setvar, $goto, $inter);
 
 GetOptions(
 "help|?" => \$helpme,
-"read=s" => \$datafile,
+"read=s" => \$readfile,
+"mem=s" => \$datafile,
 "dump=s" => \$dumps,
 "punch=s" => \$punch,
 "trace" => \$trace,
@@ -224,7 +228,8 @@ GetOptions(
 my ($srcfile, $endguard) = @ARGV;
 die qq/Usage: tacsim [ options ] <srcfile>
 -h               - this help
--r <file\@addr>  - read whitespace delimited numbers from file to addr
+-m <file\@addr>  - read whitespace delimited numbers from file to read
+-r <file\@addr>  - read whitespace delimited numbers from file to data sect at addr
 -d <n>           - dump ten memloc starting at <n> after run
 -p <addr, ...>   - print mem loc list (addrs, symbols and arrays) after run
 -s <addr=v, ...> - set mem loc list (addrs, symbols and arrays) before run
@@ -236,6 +241,11 @@ die qq/Usage: tacsim [ options ] <srcfile>
 -i               - enter interacive monitor after startup
 /
 if(!defined $srcfile || defined $endguard || defined $helpme);
+
+if(defined $readfile) {
+    $datafile = $readfile;
+    $datasect = 1;
+}
 
 die "TACSIM: Fatal: Bad output format specifier: $fmt.\n" if("dxo" !~ /$fmt/);
 # machine size
@@ -1088,6 +1098,10 @@ sub dopragma {
     } elsif($what =~/^read$/i) {
         # print "PRAGMA read $args\n";
         $datafile = $args;
+    } elsif($what =~/^memory$/i) {
+        # print "PRAGMA memory $args\n";
+        $datafile = $args;
+        $datasect = 1;
     } elsif($what =~/^bits$/i) {
         # print "PRAGMA bits $args\n";
         bitsize($args);
@@ -1190,11 +1204,13 @@ if(defined($datafile)) {
         my $valstr = read_file($datanam, chomp => 1)
         or die "Error: Cannot open datafile >$datanam< for reading.\n";
 
-        # initialze data pointer
-        $symtab{DATPTR} = [$dataloc, 'DATPTR'];
-        $mem[$dataloc] = $dataloc + 1;
-        # set DATA symbol for reset
-        $symtab{DATA} = [++$dataloc, 'DATA'];
+        if(defined $datasect) {
+            # initialze data pointer
+            $symtab{DATPTR} = [$dataloc, 'DATPTR'];
+            $mem[$dataloc] = $dataloc + 1;
+            # set DATA symbol for reset
+            $symtab{DATA} = [++$dataloc, 'DATA'];
+        }
 
         my @values = split /\s+/, $valstr;
         foreach my $val (@values) {
