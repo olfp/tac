@@ -95,7 +95,7 @@ leading asterisk (*) denotes indirection (ind): mem[arg]
 
 =head4 Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
 
-may set carry flag. Attention: mul and div have double wird result 
+may set carry flag. Attention: mul and div have double wird result
 (div has rest in high word).
 
     add <imm-or-addr> <imm-or-addr> <dir-or-addr>
@@ -191,5 +191,5 @@ Note that the argument to the pragma may not contain spaces!
 
 =head2 Installation:
 
-You will need Perl with modules File::Slurp and optional Term::ReadLine::Gnu
+You will need Perl with modules File::Slurper and optional Term::ReadLine::Gnu
 
