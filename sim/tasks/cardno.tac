@@ -2,6 +2,7 @@
 ; 1. card number is in mem in four mem cells, seperate digits, reverse
 ; A word must hold a four digit decimal, so min. 14 bits are needed
 ; 2. double every second digit. if > 9, subtract 9
+; 3. sum all digits, last digit of sum must be zero
 
 #pragma bits 14
 #pragma print cardno[4]
