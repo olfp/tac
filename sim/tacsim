@@ -97,7 +97,8 @@ leading asterisk (*) denotes indirection (ind): mem[arg]
 
 =head4 Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
 
-may set carry flag
+may set carry flag. Attention: mul and div have double wird result 
+(div has rest in high word).
 
     add <imm-or-addr> <imm-or-addr> <dir-or-addr>
 
@@ -462,9 +463,11 @@ sub tac_mul {
     my @args = tacargs(['R', 'R', 'W'], @_);
     my $argtrace = pop @args;
     my $res = $args[0] * $args[1];
+    my ($low, $high);
     $cond{'C'} = ($res & $maxcells) ? 1 : 0;
-    $mem[$args[2]] = $res = tacscale($res, 'nowarn');
-    prtrace("MUL", $argtrace, $res, 'cond') if $trace;
+    $mem[$args[2]] = $low = tacscale($res, 'nowarn');
+    $mem[$args[2]+1] = $high = ($res >> $bits);
+    prtrace("MUL", $argtrace, "D:$high-$low=$res", 'cond') if $trace;
     return 0;
 }
 
@@ -472,9 +475,11 @@ sub tac_div {
     my @args = tacargs(['R', 'R', 'W'], @_);
     my $argtrace = pop @args;
     my $res = int ($args[0] / $args[1]);
+    my $mod = int ($args[0] % $args[1]);
     $cond{'C'} = ($res & $maxcells) ? 1 : 0;
     $mem[$args[2]] = $res = tacscale($res, 'nowarn');
-    prtrace("DIV", $argtrace, $res, 'cond') if $trace;
+    $mem[$args[2]+1] = $mod = tacscale($mod, 'nowarn');
+    prtrace("DIV", $argtrace, "D:$res-$mod", 'cond') if $trace;
     return 0;
 }
 
