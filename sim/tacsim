@@ -97,7 +97,7 @@ leading asterisk (*) denotes indirection (ind): mem[arg]
 
 =head4 Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
 
-may set carry flag. Attention: mul and div have double wird result 
+may set carry flag. Attention: mul and div have double wird result
 (div has rest in high word).
 
     add <imm-or-addr> <imm-or-addr> <dir-or-addr>
@@ -193,7 +193,7 @@ Note that the argument to the pragma may not contain spaces!
 
 =head2 Installation:
 
-You will need Perl with modules File::Slurp and optional Term::ReadLine::Gnu
+You will need Perl with modules File::Slurper and optional Term::ReadLine::Gnu
 
 =cut
 
@@ -202,7 +202,7 @@ use strict;
 use Data::Dumper;
 use Term::ReadLine;
 use Getopt::Long;
-use File::Slurp;
+use File::Slurper 'read_lines';
 use Text::Tabs;
 
 # cmdline options
@@ -1131,7 +1131,7 @@ sub bitsize {
 # main
 if(defined($srcfile)) {
     print "TACSIM: Reading input from $srcfile.\n" if !$quiet;
-    @lines = expand(read_file($srcfile, chomp => 1)); # chomp & untabify
+    @lines = expand(read_lines($srcfile, 'UTF-8', 1));
 }
 
 # pass one, populate symtab
