@@ -920,6 +920,7 @@ sub symlist {
 
 sub showmem {
     my ($prompt, $first, $last) = @_;
+    # print "SHOWMEM $prompt: $first - $last\n";
     $prompt = expand($prompt);
     my $perln = int((79 - length($prompt)) / ($numlen+1)) - 1; # cells per line
     while($first <= $last) {
