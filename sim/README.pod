@@ -20,19 +20,19 @@ semicolon(;) on is a comment.
 
 =over 2
 
-=item -
+=item B<direct>
 
 normal arg is direct (dir) address; leading at-sign(@) is optional: mem[arg]
 
-=item -
+=item B<indirect>
 
 leading asterisk (*) denotes indirection (ind): mem[mem[arg]]
 
-=item -
+=item B<immediate>
 
 leading hash (#) denotes immediate value (imm): arg
 
-=item -
+=item B<indexed>
 
 an offset-address can be given in parentheses. It is subject to the usual
 sigils (# for immediate, * for indirect, @ or none for address). The
@@ -67,11 +67,11 @@ arithmetic expressions (+, -, *, / Example: base+2*3)
 
 =over 2
 
-=item -
+=item B<direct>
 
 normal arg is direct (dir) address: arg
 
-=item -
+=item B<indirect>
 
 leading asterisk (*) denotes indirection (ind): mem[arg]
 
