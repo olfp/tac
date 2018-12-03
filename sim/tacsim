@@ -1220,7 +1220,7 @@ if(defined($datafile)) {
         my @values = split /\s+/, $valstr;
         foreach my $val (@values) {
             # printf "DATASET $npic: $npic\n", $dataloc, $val;
-            $mem[$dataloc++] = $val;
+            $mem[$dataloc++] = tacscale($val, 'nowarn');
         }
     }
 }
