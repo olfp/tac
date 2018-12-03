@@ -22,8 +22,7 @@ semicolon(;) on is a comment.
 
 =over 2
 
-=item -
-normal arg is direct (dir) address; leading at-sign(@) is optional: mem[arg]
+=item - normal arg is direct (dir) address; leading at-sign(@) is optional: mem[arg]
 
 =item -
 
