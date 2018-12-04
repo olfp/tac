@@ -796,8 +796,8 @@ sub docmd {
         cmd_lstbrk($1);
     } elsif($cmdln =~/^l\s+([^,\s]+)\s*(,\s*(\+?\S+))?$/) {
         cmd_list($1, $3);
-    } elsif($cmdln =~/^p\s+(\S+.*)$/) {
-        cmd_punch($1);
+    } elsif($cmdln =~/^p(\s+(\S+.*))?$/) {
+        cmd_punch($2);
     } elsif($cmdln =~/^w(\s+(\S+.*))?$/) {
         cmd_watch($2);
     } elsif($cmdln =~/^wc$/) {
@@ -819,10 +819,11 @@ sub docmd {
         bl \t\t- list breakpoints
         bc <a> \t\t- clear breakpoint at addr <a>
         bca \t\t- clear all breakpoints
-        l <a>[, <b>] \t- list source from addr <a> to <b>
-        l #<n>[, #<mb>] \t- list source from line <n> to <m>
+        l <a>[, <b>]\t- list source from addr <a> to <b>
+        l #<n>[, #<mb>]\t- list source from line <n> to <m>
         d <a>[, <b>] \t- dump memory cells from addr <a> to <b>
         p <a>[, <b> ..]\t- print items, may be addrs, symbols or arrays
+        p \t\t- print items as given on cmd line or by #pragma print
         w <a>[, <b> ..]\t- watch items, like p, enter w ? for help
         w \t\t- print list of watched items (printed on each break)
         wc \t\t- clear list of watched items
@@ -966,11 +967,13 @@ sub cmd_list {
     }
 }
 sub cmd_punch {
-    my @symlst = symlist(shift);
+    my $arg = shift;
+    $arg = $punch if(!defined $arg);
+    my @symlst = symlist($arg);
     foreach my $sym (@symlst) {
-        my $first = $sym->{addr};
-        my $last = $first + $sym->{count} - 1;
-        showmem($sym->{ref} . "\t", $first, $last);
+	my $first = $sym->{addr};
+	my $last = $first + $sym->{count} - 1;
+	showmem($sym->{ref} . "\t", $first, $last);
     }
 }
 
