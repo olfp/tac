@@ -202,7 +202,7 @@ use strict;
 use Data::Dumper;
 use Term::ReadLine;
 use Getopt::Long;
-use File::Slurper 'read_lines';
+use File::Slurper qw(read_lines read_text);
 use Text::Tabs;
 
 # cmdline options
@@ -1210,7 +1210,7 @@ if(defined($datafile)) {
         if !defined $dataloc;
         $datasym .= "($dataloc)" if($dataloc ne $datasym);
         print "TACSIM: Reading data from $datanam to $datasym.\n" if !$quiet;
-        my $valstr = read_lines($datanam, 'UTF-8', 1)
+        my $valstr = read_text($datanam, 'UTF-8', 1)
         or die "Error: Cannot open datafile >$datanam< for reading.\n";
 
         if(defined $datasect) {
