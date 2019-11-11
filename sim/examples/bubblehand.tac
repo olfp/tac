@@ -4,7 +4,7 @@
 init:   jmp start
 
 ; data field 43 96 69 13 21 7 66 69 99 1
-data:   mem 43
+data:   mem 43 42
         mem 96
         mem 69
         mem 13

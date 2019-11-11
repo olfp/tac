@@ -155,7 +155,7 @@ set one or more memory cells at the current location to the given value.
 
 =item srs
 
-set a retrun slot (at subroutine start). Equivalent to mem 0 but tracable
+set a return slot (at subroutine start). Equivalent to mem 0 but tracable
 (generates a source line).
 
 =item .= <val>
