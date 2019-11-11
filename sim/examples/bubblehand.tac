@@ -4,7 +4,7 @@
 init:   jmp start
 
 ; data field 43 96 69 13 21 7 66 69 99 1
-data:   mem 43 42
+data:   mem 43
         mem 96
         mem 69
         mem 13
@@ -31,7 +31,7 @@ loop:   beq i o break                   ; upper bound reached?
 skip:   add i #1 i                      ; next iteration
         jmp loop
 break:  mov n o                         ; last swap is new upper bound
-        bgt o #1 start                  ; stop if less the two unsorted
+        bgt o #1 start                  ; stop if less than two unsorted
         hlt
 
 #pragma print data[10]
