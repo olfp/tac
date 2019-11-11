@@ -1,0 +1,133 @@
+tac - the three address code machine simulator/interpreter
+  Description
+    Implements a virtual cpu with the following commands, involving up to
+    three memory locations. Internal state is the program status word (PSW)
+    consisting of the current program location (address) and three flags:
+    Zero, Negative and Carry
+
+    The source lines are interpreted directly without transfer to binary
+    format, so a memory cell stores either data or a source line number.
+
+    Source lines consist of an optional label terminated with a colon (:)
+    and the tac command with up to three arguments. Everything from a
+    semicolon(;) on is a comment.
+
+   Argument syntax:
+    direct
+      normal arg is direct (dir) address; leading at-sign(@) is optional:
+      mem[arg]
+
+    indirect
+      leading asterisk (*) denotes indirection (ind): mem[mem[arg]]
+
+    immediate
+      leading hash (#) denotes immediate value (imm): arg
+
+    indexed
+      an offset-address can be given in parentheses. It is subject to the
+      usual sigils (# for immediate, * for indirect, @ or none for address).
+      The offset is evaluated and added to the base address. This results
+      in:
+
+      * base(index) => mem[index]+base
+
+      * base(#index) => index+base
+
+      * base(*index) => mem[mem[index]]+base
+
+      The whole addres expression can the be modified with another sigil (in
+      front) to make the result an immediate or indirect value.
+
+    Addresses can be given either a a number or a symbol expression. Symbol
+    expressions start with a symbol name optionally followed by basic
+    arithmetic expressions (+, -, *, / Example: base+2*3)
+
+   For jump instructions there is one level of indirection less:
+    direct
+      normal arg is direct (dir) address: arg
+
+    indirect
+      leading asterisk (*) denotes indirection (ind): mem[arg]
+
+   Address-Abbreviations:
+    <imm-or-addr> : either #<imm> or <addr> or *<addr> with optional (offs)
+    <dir-or-ind> : either <addr> or *<addr> with optional (offs)
+
+  Operations:
+   Move first argument to second
+        mov <imm-or-addr> <dir-or-ind>
+
+   Dyadic arithmetic/logic (add, sub, mul, div, and, ior, xor)
+    may set carry flag. Attention: mul and div have double wird result (div
+    has rest in high word).
+
+        add <imm-or-addr> <imm-or-addr> <dir-or-addr>
+
+   Monadic arithmetic/logic (com[plement], not)
+        com <imm-or-addr> <dir-or-addr>
+
+   Bit shifting
+    (logical or arithmentc, shift or rotate, left or right, with or without
+    carry) Implemented: logical shift/rotate left/right with carry Commands:
+    shl/shr/rol/ror
+
+        shl <imm-or-addr> <dir-or-addr>
+
+   Compare (like sub but only sets flag zero, negative and/or carry)
+        cmp <imm-or-addr> <imm-or-addr>
+
+   Branching (compare and jump if compare fullfills condition)
+    beq (equal, zero flag set), bne (not equal), ble (less or equal, zero or
+    negative flag set), blt (less than, negative flag set), bge (greater or
+    equal, zero flag set or negative clear), bgt (greater, negative clear)
+
+        beq <imm-or-addr> <imm-or-addr> <dir-or-ind>
+
+   Jumping
+    jmp, jeq (equal, zero flag set), jne (not equal), jlt (less, i.e.
+    negative flag set), jgt (greater), jcs (carry flag set), jcc (carry
+    clear)
+
+        jmp <dir-or-ind>
+
+   Jump to Subroutine
+        jsr <dir-or-ind> (mov retvec <addr>, jmp <addr+1>)
+
+   Miscelaeneous: Clear carry flag, no-operation, halt
+        clc
+        nop
+        hlt
+
+   Pseudoops:
+    mem <val>[*<cnt>]
+      set one or more memory cells at the current location to the given
+      value.
+
+    srs
+      set a return slot (at subroutine start). Equivalent to mem 0 but
+      tracable (generates a source line).
+
+    .= <val>
+      sets the location to the given value
+
+    On program start a data file may be read into a specified address range
+    and after program termination data contents may be printed. Also the
+    word width of the machine can be set on startup. This can either be
+    configured via the -b (bits), -r (read), -p (print) and -d (dump)
+    command line switches to the tacsim command or embeded in the source
+    code via #pragma pseudo-ops.
+
+    #pragma bits <num>
+    #pragma memory <file@addr>
+    #pragma read <file@addr>
+    #pragma dump <addr>,<addr>
+    #pragma dump <addr>,+<cnt>
+    #pragma dump <addr>
+    #pragma print <list of variables, arrays, addresses>
+
+    Note that the argument to the pragma may not contain spaces!
+
+  Installation:
+    You will need Perl with modules File::Slurper and optional
+    Term::ReadLine::Gnu
+
